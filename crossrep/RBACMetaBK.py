@@ -2,7 +2,7 @@
 import crossrep,re, threading
 """
 Created on Oct 1 2018
-Updated on July 12th 2020
+Updated on July 2nd 2020
 """
 __author__ = 'Minzhen Yang, Advisory Services, Snowflake Computing'
 # *********************************************************************************************************************
@@ -162,86 +162,6 @@ def crRoles( cursor):
     cursor.execute("commit")
     if crossrep.verbose == True:
         print ('Finishing create role table ...')
-
-### credit to Renga, change based on renga's function for the change of using available account_usage views 
-### create table parent_child for role and user relationships: parent_child
-### if the current record exists in the table, update it; if not exists in the table, insert it; 
-### if not exists in current temp table but exists in the parent_child table, delete it
-# tb_priv : table name for all privileges
-# tb_role: the child role that's created
-# cursor: cursor connects to your snowflake account where it creates tables to store metadata
-def crParentPriv( cursor):
-    if crossrep.verbose == True:
-        print ('Starting create parent_child and privileges tables ...')
-
-    if crossrep.mode == 'CUSTOMER':
-        contx = crossrep.getConnection(crossrep.default_acct, crossrep.default_usr, crossrep.default_pwd, crossrep.default_wh, crossrep.default_rl)
-    elif crossrep.mode == 'SNOWFLAKE':
-        contx = crossrep.getSFConnection(crossrep.default_acct, crossrep.default_usr, crossrep.default_wh, crossrep.default_rl)
-    cs = contx.cursor()
-    cs.execute("USE DATABASE "+crossrep.default_db)
-    cs.execute("USE SCHEMA "+crossrep.default_sc)
-    
-    tbname = crossrep.tb_pcrl
-    tbpriv = crossrep.tb_priv
-    
-    sql_stmt1 = ( "create or replace table " + tbname  +
-        """
-        as 
-        select 
-            date_trunc('second',created_on) as created_at
-            , name as role_name 
-            , granted_on as granted_to 
-            , grantee_name 
-            , granted_by 
-        from snowflake.account_usage.grants_to_roles 
-        where 1 = 1 
-        and deleted_on is null
-        and granted_on = 'ROLE' 
-        and privilege = 'USAGE' 
-        and granted_to = 'ROLE'  
-        union all 
-        select 
-            date_trunc('second',created_on) as created_at
-            , role as role_name 
-            , granted_to 
-            , grantee_name 
-            , granted_by 
-        from snowflake.account_usage.grants_to_users
-        where deleted_on is null
-        and granted_to = 'USER'
-    """ )
-    sql_stmt2 = ("create or replace table " + tbpriv  +
-        """
-        as  
-        select 
-            date_trunc('second',created_on) as created_at 
-            , PRIVILEGE as priv 
-            , case 
-                when GRANTED_ON = 'INTEGERATION' then 'INTEGRATION' 
-                else GRANTED_ON 
-              end as OBJECT_TYPE 
-            , CASE 
-                WHEN (TABLE_CATALOG IS NULL OR GRANTED_ON = 'DATABASE') THEN NAME
-                WHEN (GRANTED_ON = 'SCHEMA') then TABLE_CATALOG || '.' || NAME 
-                ELSE COALESCE(TABLE_CATALOG || COALESCE('.' || TABLE_SCHEMA || '.', '.') || NAME, NAME) 
-              END as OBJECT_NAME 
-            , GRANTEE_NAME as role 
-            , GRANT_OPTION 
-        from snowflake.account_usage.grants_to_roles
-        where 1 = 1
-    """ )
-    if crossrep.verbose == True:
-        print(sql_stmt1)
-        print(sql_stmt2)
-    cs.execute("begin")
-    cs.execute(sql_stmt1)
-    cs.execute(sql_stmt2)
-    cs.execute("commit")
-    cs.close()
-    contx.close()
-    if crossrep.verbose == True:
-        print ('Finishing create parent_child and privileges table ' )
 
 ### create table parent_child for role and user relationships: parent_child
 ### if the current record exists in the table, update it; if not exists in the table, insert it; 

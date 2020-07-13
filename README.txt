@@ -98,17 +98,7 @@ SNOWHOUSE_xxx is environment variable for SNOWHOUSE (snowflake internal only)
  
 Step 2: to create all metadata needed initially (first run, 2nd or later run will have incremental updates)
   1) open 3 terminals, in each terminal, source env_xxx.sh
-  2) run one of the following in each terminal
-  python main.py -c 1
-  python main.py -c 2
-  python main.py -c 3
-  3) once first one (python main.py -c 1) completes, run the following in parallel in 2 terminals (run 'source env_xxx.sh' if new terminal)
-  python main.py -c 4
-  python main.py -c 5
-  4) once option 3 completes (python main.py -c 3 ), run the following (in parallel):
-  python main.py -c 6
-
-  or you can run all of metadata creation :
+  2) you can run all of metadata creation :
   python main.py -c all
 
   This step will generate the following user created table in the database of SRC_CUST_DATABASE and schema of SRC_CUST_SCHEMA:
@@ -184,7 +174,6 @@ prod_monitor_last_refresh.sql
 
 Step 8: Ask Customer to execute sql commands generated from previous step on customer's stand-by accounts to create and link standby databases 
 snowsql -f b2_create_standby_global.sql
-
 
 Step 9: Ask Customer to execute sql commands of refresh standby databases on customer's stand-by accounts 
 snowsql -f b3_refresh_all_global.sql
@@ -309,7 +298,6 @@ Post-replication actions:
   - user login
 
 4. drop role repadmin 
-
 
 Typical use cases (using CUSTOMER mode as example):
 1. using snowflake replication engine, migrating an account from one region to another region (CUSTOMER mode)

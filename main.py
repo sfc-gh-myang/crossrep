@@ -212,9 +212,11 @@ if args.create:
         if coption == '0':
             crossrep.crRoles( cursor)
             crossrep.crUsers( cursor)
-            crossrep.crParent( cursor)           
-            crossrep.crPriv( cursor)
-
+            crossrep.crParentPriv( cursor) 
+            #crossrep.crParent( cursor)           
+            #crossrep.crPriv( cursor)
+            
+            '''
         if coption == '1':
             crossrep.crRoles( cursor)
             crossrep.crUsers( cursor)
@@ -223,31 +225,31 @@ if args.create:
             crossrep.crResMonitor(cursor)
             if crossrep.mode == 'CUSTOMER':
                 crossrep.crNetworkPolicy(cursor)
-            
         elif coption == '3':    
             crossrep.crShares( cursor) 
             crossrep.crDatabase (cursor)  
             if crossrep.mode == 'SNOWFLAKE':
                 crossrep.crSchema ( cursor) 
-            
-
-        elif coption == '4':
-            crossrep.crParent( cursor)           
-        elif coption == '5':
-            crossrep.crPriv( cursor)
+        elif coption == '4' or coption == '5':
+            #crossrep.crParent( cursor)    
+            crossrep.crParentPriv (cursor)      
+        #elif coption == '5':
+        #    crossrep.crPriv( cursor)
         elif coption == '6':    
             crossrep.crTable_DefaultSequence ( cursor)
             
             if crossrep.mode == 'SNOWFLAKE':
                 crossrep.crTable_Constraints( cursor)
-            
+            '''
+
         elif coption == 'all':
             crossrep.crWarehouse(cursor)
             crossrep.crResMonitor(cursor)
             crossrep.crRoles(cursor)
             crossrep.crUsers(cursor)
-            crossrep.crParent( cursor)
-            crossrep.crPriv( cursor)
+            #crossrep.crParent( cursor)
+            crossrep.crParentPriv( cursor)
+            #crossrep.crPriv( cursor)
             crossrep.crShares( cursor)
             crossrep.crDatabase ( cursor)
             crossrep.crTable_DefaultSequence ( cursor)

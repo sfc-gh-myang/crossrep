@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Created on Oct 1 2018
-Updated on July 2nd 2020
+Updated on July 12th 2020
 """
 __author__ = 'Minzhen Yang, Advisory Services, Snowflake Computing'
 
@@ -10,6 +10,7 @@ import snowflake.connector
 from .RBACMeta import crUsers
 from .RBACMeta import crRoles
 from .RBACMeta import crParent
+from .RBACMeta import crParentPriv
 from .RBACMeta import insParent
 from .RBACMeta import updParent
 from .RBACMeta import crPriv

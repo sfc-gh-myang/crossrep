@@ -18,7 +18,7 @@ Command options description in python main.py -x where -x in one of the followin
   -b:           to Generate account privige grant commands 
   -d all:       to generate grants of ownerships and privileges on all database level objects
       filename: file contains the list of databases to be generated grants for 
-  -ddl all:     to create ddl for all databases in the account (manual replication only) 
+  -ddl all:     to create ddl statements for all databases in the account (manual replication only) 
       filename: file contains the list of databases whose DDLs need to be created, one line per database in the file. 
   -elt all:     to create elt jobs for all databases in the account (manual replication only)   
       filename: file contains the list of databases whose DDLs need to be created, one line per database in the file. 

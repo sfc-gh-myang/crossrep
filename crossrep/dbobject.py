@@ -134,7 +134,7 @@ def genDatabaseDDL ( dbname, of, cursor):
         print('Query:\t' + dquery)
 
     if crossrep.verbose == True:
-        print('Finish creating database table ...')
+        print('Finish creating database DDL script file ...')
 
 ### drop all databases using all_databases table
 # tbshare: table name for all shares

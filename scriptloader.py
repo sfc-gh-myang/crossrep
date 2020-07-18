@@ -24,7 +24,7 @@ def list_scripts(migHome, objectType = ''):
         root_folder += objectType + "/"
     for root, dirs, files in os.walk(root_folder):
         for file in files:
-            if file.endswith(".sql"):
+            if file.endswith(".sql") and file.startswith("01_dbDDL_"):
                 # sort_on = "key2"
                 dict = {}
                 dict['file'] = file
@@ -50,17 +50,25 @@ def build_ddl_statememts(mode, batch_id, long_sql_text, file_path, cursor, faile
     retry_list = []
     cur_database = ""
     cur_schema = ""
-    table_keyword = "create TABLE if not exists "
-    schema_keyword = "create schema if not exists "
-    db_keyword = "create database if not exists "
+    # table_keyword = "create TABLE if not exists "
+    # schema_keyword = "create schema if not exists "
+    # db_keyword = "create database if not exists "
     use_db_keyword = "use database "
     use_schema_keyword = "use schema "
     sp_keyword = "create PROCEDURE if not exists "
-    view_keyword = "create view if not exists "
+    #view_keyword = "create view if not exists "
     mview_keyword = "create materialized view if not exists "
     fn_keyword = "create FUNCTION if not exists "
     file_format_keyword = "create FILE FORMAT if not exists "
-    seq_keyword = "create sequence if not exists "
+    #seq_keyword = "create sequence if not exists "
+    create_secure_view_keyword = "CREATE SECURE VIEW "
+    grant_keyword = "grant "
+    create_keyword = "create "
+    create_or_replace_keyword = "create or replace "
+    alter_keyword = "alter "
+    # use_keyword = "use "
+    if_not_exists_keyword = " if not exists"
+
     total_statement = 0
     i = 0;
     while i < len(sql_statements)-1:
@@ -69,27 +77,8 @@ def build_ddl_statememts(mode, batch_id, long_sql_text, file_path, cursor, faile
             continue
 
         statement_type = 'unknown'
-        if statement.startswith(db_keyword):
-            statement_type = db_keyword.upper()
-        elif statement.startswith(schema_keyword):
-            statement_type = schema_keyword.upper()
-        elif statement.startswith(table_keyword):
-            statement_type = table_keyword.upper()
-        elif statement.startswith(view_keyword):
-            statement_type = view_keyword.upper()
-        elif statement.startswith(mview_keyword):
-            statement_type = mview_keyword.upper()
-        elif statement.startswith(file_format_keyword):
-            statement_type = file_format_keyword.upper()
-        elif statement.startswith(use_db_keyword):
-            statement_type = use_db_keyword.upper()
-            cur_database = statement[len(use_db_keyword)::]
-        elif statement.startswith(use_schema_keyword):
-            statement_type = use_schema_keyword.upper()
-            cur_schema = statement[len(use_schema_keyword)::]
-        elif statement.startswith(seq_keyword):
-            statement_type = seq_keyword.upper()
-        elif statement.startswith(sp_keyword) or statement.startswith(fn_keyword):
+
+        if statement.startswith(sp_keyword) or statement.startswith(fn_keyword):
             if statement.startswith(sp_keyword):
                 statement_type = sp_keyword.upper()
             else:
@@ -97,12 +86,47 @@ def build_ddl_statememts(mode, batch_id, long_sql_text, file_path, cursor, faile
             statement = statement + "\n"
             while i + 1 < len(sql_statements):
                 i = i + 1
-                if sql_statements[i].lstrip().startswith("create "):
+                if sql_statements[i].lstrip().startswith(create_keyword):
                     i = i - 1
                     break
                 else:
                     statement = statement + sql_statements[i] + ";"
-        print(statement)
+        else:
+            statement = statement.replace("  ", " ")
+
+            if statement.lower().startswith(use_db_keyword):
+                statement_type = use_db_keyword.upper()
+                cur_database = statement[len(use_db_keyword)::]
+            elif statement.lower().startswith(use_schema_keyword):
+                statement_type = use_schema_keyword.upper()
+            elif statement.upper().startswith(create_secure_view_keyword):
+                statement_type = create_secure_view_keyword
+            elif statement.lower().startswith(create_or_replace_keyword):
+                end_index = statement.lower().find(" ", len(create_or_replace_keyword) + 1)
+                if end_index >= 0:
+                    statement_type = (create_or_replace_keyword + statement[len(create_or_replace_keyword):end_index]).upper()
+                if statement_type.find("TRANSIENT") > 0:
+                    statement_type = statement_type + " TABLE"
+            elif statement.lower().startswith(grant_keyword):
+                end_index = statement.lower().find(" ", 6)
+                if end_index >= 0:
+                    statement_type = (grant_keyword + statement[5:end_index]).upper()
+            elif statement.lower().find(create_secure_view_keyword) > 0:
+                statement_type = "CREATE SECURE VIEW";
+            elif statement.lower().startswith(create_keyword):
+                # find te keywords between "create " and " if not exists"
+                end_index = statement.lower().find(if_not_exists_keyword, 7)
+                if end_index >= 0:
+                    statement_type = (create_keyword + statement[6:end_index]).upper()
+            elif statement.lower().startswith(alter_keyword):
+                # find te keywords between "create " and " if not exists"
+                end_index = statement.lower().find(" ", 6)
+                if end_index >= 0:
+                    statement_type = (create_keyword + statement[5:end_index]).upper()
+            else:
+                #'GRANT  READ ON STAGE ABI_WH.HIGH_END_SRCE_S.HE_FLOAD_STAGE TO ROLE ABI_MOBILIZE_BTEQ_DEV'
+                print(statement)
+
         try:
             if mode == 'DR_TEST':
                 if statement_type == 'unknown':

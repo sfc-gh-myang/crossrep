@@ -45,7 +45,7 @@ def upload_scripts(mode, filedict, cursor, failed_statements):
         f.close()
 
 
-def build_dll_statememts(mode, batch_id, long_sql_text, file_path, cursor, failed_statements):
+def build_ddl_statememts(mode, batch_id, long_sql_text, file_path, cursor, failed_statements):
     sql_statements = long_sql_text.split(";")
     retry_list = []
     cur_database = ""

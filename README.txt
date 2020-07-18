@@ -17,10 +17,10 @@ Command options description in python main.py -x where -x in one of the followin
   -c all:       to get incremental updates of metadata , and store them in local tables
   -b:           to Generate account privige grant commands 
   -d all:       to generate grants of ownerships and privileges on all database level objects
-      filename: file contains the list of databases to be generated grants for 
-  -ddl all:     to create ddl for all databases in the account (manual replication only) 
-      filename: file contains the list of databases whose DDLs need to be created, one line per database in the file. 
-  -elt all:     to create elt jobs for all databases in the account (manual replication only)   
+      filename: file contains the list of databases to be generated grants for
+  -ddl all:     to create ddl for all databases in the account (manual replication only)
+      filename: file contains the list of databases whose DDLs need to be created, one line per database in the file.
+  -elt all:     to create elt jobs for all databases in the account (manual replication only)
       filename: file contains the list of databases whose DDLs need to be created, one line per database in the file. 
   -e num:       to generate report, alter/drop/ddl statement for reference objects that needs to be handled ahead of replication (cross-database referrenced and ID-based objects)
                 num is a version number to generate a different version file in case you need to execute multiple times so you don't override the previous generated files 

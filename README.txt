@@ -17,10 +17,10 @@ Command options description in python main.py -x where -x in one of the followin
   -c all:       to get incremental updates of metadata , and store them in local tables
   -b:           to Generate account privige grant commands 
   -d all:       to generate grants of ownerships and privileges on all database level objects
-      filename: file contains the list of databases to be generated grants for 
-  -ddl all:     to create ddl statements for all databases in the account (manual replication only) 
-      filename: file contains the list of databases whose DDLs need to be created, one line per database in the file. 
-  -elt all:     to create elt jobs for all databases in the account (manual replication only)   
+      filename: file contains the list of databases to be generated grants for
+  -ddl all:     to create ddl for all databases in the account (manual replication only)
+      filename: file contains the list of databases whose DDLs need to be created, one line per database in the file.
+  -elt all:     to create elt jobs for all databases in the account (manual replication only)
       filename: file contains the list of databases whose DDLs need to be created, one line per database in the file. 
   -e num:       to generate report, alter/drop/ddl statement for reference objects that needs to be handled ahead of replication (cross-database referrenced and ID-based objects)
                 num is a version number to generate a different version file in case you need to execute multiple times so you don't override the previous generated files 
@@ -78,7 +78,7 @@ SNOWHOUSE_xxx is environment variable for SNOWHOUSE (snowflake internal only)
   
   TARGET_ROLE=REPADMIN                                      => custom role used for replication on customer standby account 
   MIGRATION_HOME=/Users/myang/crossreplication/prod/        => home folder for this python package code 
-  REP_MODE=CUSTOMER                                         => tell whether this is executing by CUSTOMER or SNOWFLAKE or SNOWHOUSE, default mode (can be overriden using option -m )
+  REP_MODE=CUSTOMER                                         => tell whether this is executing by CUSTOMER or SNOWFLAKE or SNOWHOUSE, or DR or DR_TEST, default mode (can be overriden using option -m )
   AU_DATABASE=DB_CROSSREP                                   => database name for storing account_usage information in source account, create if not existing, only at CUSTOMER mode  
   AU_SCHEMA=SC_ACCTUSAGE                                    => schema name for storing account_usage information in source account, create if not existing, only at CUSTOMER mode  
   REP_ACCT_LIST=aws_us_east_1.myaccount2                    => account list to be enabled on replication
@@ -358,3 +358,10 @@ Output script structure (this is where generated DDLs/grants are stored. if not 
   rbac      ==> grants for database level objects
   rep       ==> scripts for replication commands (using snowflake replicaiton engine)
   snowhouse ==> scripts generated on snowhouse including INTEGRATION DDL, dependency report on snowhouse database 
+
+For Customers only want to execute the DDL on the target account and not using replication, they can use DR and DR_TEST mode
+  DR mode - load all the scripts under DDL folder, parse all the DDL scripts and execute them one by one.  There will be times
+  when a statement fails because the db objects it depends on has not been created on the target account.  It will retry all the failed SQL statements
+  after the initial round and repeat the re-trying process untill no more successes can be achieve.  Errors will be reported.
+
+  DR_TEST mode - similar to DR mode but it does not run the SQL statements, only output the statement one by one.  For testing purpose only.

@@ -15,15 +15,16 @@ __author__ = 'Minzhen Yang, Advisory Services, Snowflake Computing'
 #  - their DDLs that can be generated , then to be executed in target system are as follows:
 #    scripts/rbac/21_create_users.sql           => DDL to create all users
 #    scripts/rbac/22_create_roles.sql           => DDL to create all roles
-#    scripts/rbac/23_grant_roles.sql            => grants to grant roles/users to other roles 
+#    scripts/rbac/23_grant_roles.sql            => grants to grant roles/users to other roles
 #    scripts/rbac/24_grant_target_roles.sql     => grants ownership of TARGET_ROLE to all roles (to avoid prilege issues during replication)
 #    scripts/rbac/25_grant_owner_dblevel.sql    => grant ownership for all objects in all databases
-#    scripts/rbac/26_grant_privs_dblevel.sql    => grant privileges for all objects in all databases 
+#    scripts/rbac/26_grant_privs_dblevel.sql    => grant privileges for all objects in all databases
 #    scripts/rbac/25_grantowner_dblevel_<dbfile>.sql  => grant ownership for all objects in the database list as in <dbfile>
 #    scripts/rbac/26_grantpriv_dblevel_<dbfile>.sql   => grant privileges for all objects in the database list as in <dbfile>
 #    scripts/rbac/27_future_grants.sql          => grant all future grants
 #
 # *********************************************************************************************************************
+
 
 ### without password for SSO
 ### generating all users' DDL using all_users table information
@@ -118,7 +119,7 @@ def genRoleDDL( ofile, cursor):
     for r in rec:
         role_name = r[0]
         if crossrep.hasSpecial(role_name) == True:
-            role_name = "\"" + role_name + "\"" 
+            role_name = "\"" + role_name + "\""
             if crossrep.verbose==True:
                 print(' role name: ' + role_name)
 
@@ -137,7 +138,7 @@ def genRoleDDL( ofile, cursor):
 # cursor: cursor connects to your snowflake account where it creates tables to store metadata
 def grantAllRoles(ofile, cursor):
     query = ( "select role_name, granted_to, grantee_name, granted_by from " + 
-    crossrep.tb_pcrl + " where role_name != 'PUBLIC' and "
+    '"' + crossrep.tb_pcrl + '"' + " where role_name != 'PUBLIC' and "
     " (role_name not in ('ACCOUNTADMIN', 'SECURITYADMIN','SYSADMIN')  OR grantee_name not in ('ACCOUNTADMIN', 'SECURITYADMIN','SYSADMIN', 'PUBLIC') ) " +
     " order by role_name ,granted_to, grantee_name ")
 
@@ -540,7 +541,7 @@ def grantFutureObj( ofile, cursor):
             ofile.write(grantSQL+';\n')
             #print(grantSQL)
         else:
-            if obj_type == 'FILE_FORMAT': 
+            if obj_type == 'FILE_FORMAT':
                 grantSQL = ( "GRANT  " + priv + " ON FUTURE FILE FORMATS IN SCHEMA " + db + "." + sc + " TO ROLE " + role + with_grant )
             else:
                 grantSQL = ( "GRANT  " + priv + " ON FUTURE "+ obj_type + "S IN SCHEMA " + db + "." + sc + " TO ROLE " + role + with_grant )

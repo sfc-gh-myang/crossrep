@@ -10,6 +10,7 @@ import snowflake.connector
 import os, re, string, subprocess, sys, time,getpass
 import crossrep
 from multiprocessing import Process
+import scriptloader
 
 def setDefaultEnv(mode):
     if mode == 'CUSTOMER':
@@ -20,6 +21,8 @@ def setDefaultEnv(mode):
         crossrep.default_wh = crossrep.getEnv('SRC_CUST_WAREHOUSE')
         crossrep.default_db = crossrep.getEnv('SRC_CUST_DATABASE')
         crossrep.default_sc = crossrep.getEnv('SRC_CUST_SCHEMA')
+        crossrep.acctpref = ''
+        crossrep.acctpref_qualifier = ''
     elif mode == 'SNOWFLAKE':
         crossrep.default_usr = crossrep.getEnv('SRC_PROD_USER')
         crossrep.default_acct = crossrep.getEnv('SRC_PROD_ACCOUNT')
@@ -35,6 +38,14 @@ def setDefaultEnv(mode):
         crossrep.default_wh = crossrep.getEnv('SNOWHOUSE_WAREHOUSE')
         crossrep.default_db = crossrep.getEnv('SNOWHOUSE_DATABASE')
         crossrep.default_sc = crossrep.getEnv('SNOWHOUSE_SCHEMA')
+    elif mode == 'DR':
+        crossrep.default_usr = crossrep.getEnv("TGT_CUST_USER")
+        crossrep.default_acct = crossrep.getEnv("TGT_CUST_ACCOUNT")
+        crossrep.default_pwd = crossrep.getEnv('TGT_CUST_PWD')
+        crossrep.default_rl = crossrep.getEnv('TGT_CUST_ROLE')
+        crossrep.default_wh = crossrep.getEnv('TGT_CUST_WAREHOUSE')
+        crossrep.default_db = crossrep.getEnv('TGT_CUST_DATABASE')
+        crossrep.default_sc = crossrep.getEnv('TGT_CUST_SCHEMA')
 
 ##### MAIN #####
 parser = argparse.ArgumentParser(description='Fix grants generation by grant ownership and grant PRIVILEGES.',
@@ -177,22 +188,50 @@ elif crossrep.mode == 'SNOWFLAKE':
     ctx = crossrep.getSFConnection(crossrep.default_acct, crossrep.default_usr, crossrep.default_wh, crossrep.default_rl)
 elif crossrep.mode == 'CUSTOMER':
     ctx = crossrep.getConnection(crossrep.default_acct, crossrep.default_usr, crossrep.default_pwd, crossrep.default_wh, crossrep.default_rl)
+elif crossrep.mode == 'DR':
+    ctx = crossrep.getConnection(crossrep.default_acct, crossrep.default_usr, crossrep.default_pwd, crossrep.default_wh, crossrep.default_rl)
 
-cursor = ctx.cursor()
+if crossrep.mode == 'DR_TEST':
+    cursor = None
+else:
+    cursor = ctx.cursor()
+
+if crossrep.mode == 'DR' or crossrep.mode == 'DR_TEST':
+    filelist  = scriptloader.list_scripts(migHome, "ddl")
+    failed_statements = []
+    for f in filelist:
+        scriptloader.upload_scripts(crossrep.mode, f, cursor, failed_statements)
+
+    if crossrep.mode == 'DR':
+        remaining_failures = scriptloader.retry_failed_statements(cursor, failed_statements)
+    else:
+        remaining_failures = failed_statements
+    for item in remaining_failures:
+        print("\nDDL Statement failed ---->" + item["statement"])
+        print("Error: " + item["error"])
+
+
+    if cursor != None:
+        cursor.close()
+
+    sys.exit()
+
+
 if crossrep.mode == 'CUSTOMER':
     cursor.execute("CREATE DATABASE IF NOT EXISTS "+crossrep.default_db)
     cursor.execute("USE WAREHOUSE "+crossrep.default_wh)
 cursor.execute("USE DATABASE "+crossrep.default_db)
-if crossrep.mode == 'CUSTOMER' or crossrep.mode == 'SNOWFLAKE':
+if crossrep.mode == 'CUSTOMER' or crossrep.mode == 'SNOWFLAKE' or crossrep.mode == 'DR':
     cursor.execute("CREATE SCHEMA IF NOT EXISTS "+crossrep.default_sc)
+
 cursor.execute("USE SCHEMA "+crossrep.default_sc)
 #cursor.execute("USE WAREHOUSE "+wh)
 
 ### -u option: create a list of user tables to store account_usage data in source snowflake account, run by customer
-if args.acctusage: 
+if args.acctusage:
     dbau = crossrep.getEnv('AU_DATABASE')
     scau = crossrep.getEnv('AU_SCHEMA')
-    
+
     try:
         crossrep.crAccountUsage(dbau, scau, cursor)
     except Exception as err:
@@ -207,15 +246,14 @@ if args.create:
     try:
         if crossrep.verbose:
             print('collecting metadata ... ')
-        
-        # RBAC only: user, roles and privileges 
+        # RBAC only: user, roles and privileges
         if coption == '0':
-            crossrep.crRoles( cursor)
-            crossrep.crUsers( cursor)
-            crossrep.crParentPriv( cursor) 
-            #crossrep.crParent( cursor)           
-            #crossrep.crPriv( cursor)
-            
+            crossrep.crRoles(cursor)
+            crossrep.crUsers(cursor)
+            crossrep.crParentPriv(cursor)
+            # crossrep.crParent( cursor)
+            # crossrep.crPriv( cursor)
+
             '''
         if coption == '1':
             crossrep.crRoles( cursor)
@@ -229,7 +267,7 @@ if args.create:
             crossrep.crShares( cursor) 
             crossrep.crDatabase (cursor)  
             if crossrep.mode == 'SNOWFLAKE':
-                crossrep.crSchema ( cursor) 
+                crossrep.crSchema ( cursor)             
         elif coption == '4' or coption == '5':
             #crossrep.crParent( cursor)    
             crossrep.crParentPriv (cursor)      
@@ -264,10 +302,10 @@ if args.create:
         print('An error occured during creating metadata tables :' + str(err) )
         #pass
 
-## -b option: grant all privilege on account 
+## -b option: grant all privilege on account
 if args.beyond :
-    ### grant PRIVILEGES on ACCOUNT 
-    ofile = open(migHome + "scripts/acctobj/14_grant_acct_level_privs.sql","w") 
+    ### grant PRIVILEGES on ACCOUNT
+    ofile = open(migHome + "scripts/acctobj/14_grant_acct_level_privs.sql","w")
     try:
         crossrep.grantAcctPrivs(ofile, cursor)
     except Exception as err:
@@ -337,7 +375,7 @@ if args.ddl:
                 + crossrep.tb_share + " where db_name is not null and kind = 'INBOUND'")
             rec = cursor.fetchall()
             for r in rec:
-                of = open(file_pref + r[0]+".sql","w") 
+                of = open(file_pref + r[0]+".sql","w")
                 crossrep.genDatabaseDDL ( r[0], of, cursor)
                 of.close()
         else:
@@ -347,7 +385,7 @@ if args.ddl:
                 print('dbfile path/name: '+dbfilepath)
                 print(ddl_dblist)
             for adb in ddl_dblist:
-                of = open(file_pref + adb+".sql","w") 
+                of = open(file_pref + adb+".sql","w")
                 crossrep.genDatabaseDDL ( adb, of, cursor)
                 of.close()
     except Exception as err:
@@ -388,7 +426,7 @@ if args.evaluate:
     ver = args.evaluate
     try:
         
-        ddl_file = open(migHome + "scripts/eval/a1_fk_DDL_"+ ver +".sql","w") 
+        ddl_file = open(migHome + "scripts/eval/a1_fk_DDL_"+ ver +".sql","w")
         drop_file = open(migHome + "scripts/eval/a1_drop_fk_"+ ver +".sql","w") 
         add_file = open(migHome + "scripts/eval/a1_add_fk_"+ ver + ".sql","w") 
         crossrep.repFKeys (ddl_file, drop_file, add_file, cursor)
@@ -449,7 +487,7 @@ if args.freeze:
     ofile1.close()
     ofile2.close()
 
-#### to generate ALTER DATABASE ENABLE REPLICATION statements 
+#### to generate ALTER DATABASE ENABLE REPLICATION statements
 ## -g option: all or database file with list of databases, default to all if empty option
 if gldb != None:
 
@@ -533,7 +571,7 @@ if args.link:
     sffile.close()
 
 ## -mon: executing monitoring queries on target account in PROD or customer account
-if args.monitor : 
+if args.monitor :
     #tbname = 'TB_REPMONITOR'
     tbname = 'TB_MONITOR'
     dbmonfile = migHome + args.monitor
@@ -600,7 +638,7 @@ if args.parameter:
     crossrep.crAcctParameters(cursor)
     ofile = open(migHome + "scripts/acctobj/41_set_parameters.sql","w")
     # The file parms.txt stores current valid account parameters that user can control, in the same folder as main.py???
-    valid_parmlist = crossrep.readFile(migHome+'/parms.txt')
+    valid_parmlist = crossrep.readFile(migHome+'parms.txt')
     crossrep.setAcctParameters(valid_parmlist,ofile, cursor)
     ofile.close()
 
@@ -625,7 +663,7 @@ if args.pipe :
         crossrep.grantByObjType('PIPE', sf, cursor)
 
     except Exception as err:
-        print('An error occured during creating stage DDL :' + str(err) )
+        print('An error occured during creating pipe DDL :' + str(err) )
     sf.close()
 
 #### -r with 3 options (nopwd, samepwd, randpwd): 
@@ -720,7 +758,7 @@ if args.stage :
 
 # -t option: dropping all created objects in target account so it can be rerun for testing purpose
 if args.test:
-    # python main.py -t MYANG MDONOVAN NMAHESH 
+    # python main.py -t MYANG MDONOVAN NMAHESH
     # excluding: MYANG MDONOVAN NMAHESH from dropping list
     excludeUserList = args.test
     # drop all account objects including warehouses, resouce monitors, network policies 
@@ -759,6 +797,7 @@ if args.validate:
             if crossrep.verbose:
                 print('dbfile path/name: '+dbfilepath)
                 print(val_dblist)
+
 
             crossrep.valCountHash(val_dblist, rfile)
 

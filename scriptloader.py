@@ -36,9 +36,12 @@ def list_scripts(migHome, objectType = ''):
 def upload_scripts(mode, filedict, cursor, failed_statements):
     # open file
     filename = os.path.join(filedict['path'], filedict['file'])
+    print("--------------------------------------------------")
+    print("Opening script file: " + filename )
     f = open(filename, "r")
     if f.mode == "r":
         contents = f.read()
+        print("Script file read, size = " + str(len(contents)))
         batch_id = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         # cursor.execute("CALL mei_db_crossrep.mei_tgt_crossrep.parse_sql_script(%s, %s, %s)", (batch_id, filename, contents))
         build_ddl_statememts(mode, batch_id, contents, filename, cursor, failed_statements)
@@ -133,7 +136,12 @@ def build_ddl_statememts(mode, batch_id, long_sql_text, file_path, cursor, faile
                     failed_statements.append(
                         {"statement_type": statement_type, "cur_database": cur_database, "cur_schema": cur_schema,
                          "statement": statement, "file_path": file_path, "error": "Bad Statement"})
+                else:
+                    print("------------------------ Statement found (" + str(total_statement+1) + ") ----------------------------")
+                    print(statement)
             elif mode == 'DR':
+                print("------------------------ Running Statement (" + str(total_statement+1) + ") ----------------------------")
+                print(statement)
                 cursor.execute(statement)
         except:
             failed_statements.append({"statement_type": statement_type, "cur_database": cur_database, "cur_schema": cur_schema,
@@ -143,7 +151,7 @@ def build_ddl_statememts(mode, batch_id, long_sql_text, file_path, cursor, faile
         #    sqlText: "INSERT INTO source_scripts (BATCH_ID,SCRIPT_FILE_NAME_PATH, SQL_TEXT, STATEMENT_TYPE, USE_DATABASE_NAME, USE_SCHEMA_NAME) VALUES (?, ?, ?, ?, ?, ?);",
         #    binds: [BATCH_ID, FILE_PATH, statement, statement_type, cur_database, cur_schema]
         # }
-
+        print("")
         # result_set1 = stmt.execute();
         total_statement = total_statement + 1
         i = i + 1

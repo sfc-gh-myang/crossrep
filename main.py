@@ -638,7 +638,7 @@ if args.parameter:
     crossrep.crAcctParameters(cursor)
     ofile = open(migHome + "scripts/acctobj/41_set_parameters.sql","w")
     # The file parms.txt stores current valid account parameters that user can control, in the same folder as main.py???
-    valid_parmlist = crossrep.readFile(migHome+'/parms.txt')
+    valid_parmlist = crossrep.readFile(migHome+'parms.txt')
     crossrep.setAcctParameters(valid_parmlist,ofile, cursor)
     ofile.close()
 

@@ -305,6 +305,7 @@ default_acct = ''
 default_pwd = ''
 default_rl = ''
 default_wh = ''
+passdefault_wh = ''
 default_db = ''
 default_sc = ''
 

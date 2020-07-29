@@ -1,5 +1,6 @@
 import os
 from datetime import datetime
+import snowflake.connector
 import glob
 from os import listdir
 from os.path import isfile, join
@@ -77,6 +78,7 @@ def build_ddl_statememts(mode, batch_id, long_sql_text, file_path, cursor, faile
     while i < len(sql_statements)-1:
         statement = sql_statements[i].lstrip()
         if len(statement) == 0:
+            i = i + 1
             continue
 
         statement_type = 'unknown'
@@ -143,15 +145,15 @@ def build_ddl_statememts(mode, batch_id, long_sql_text, file_path, cursor, faile
                 print("------------------------ Running Statement (" + str(total_statement+1) + ") ----------------------------")
                 print(statement)
                 cursor.execute(statement)
-        except:
+        except snowflake.connector.errors.ProgrammingError as e:
             failed_statements.append({"statement_type": statement_type, "cur_database": cur_database, "cur_schema": cur_schema,
                               "statement": statement, "file_path": file_path})
+            pass
         # stmt = snowflake.createStatement(
         # {
         #    sqlText: "INSERT INTO source_scripts (BATCH_ID,SCRIPT_FILE_NAME_PATH, SQL_TEXT, STATEMENT_TYPE, USE_DATABASE_NAME, USE_SCHEMA_NAME) VALUES (?, ?, ?, ?, ?, ?);",
         #    binds: [BATCH_ID, FILE_PATH, statement, statement_type, cur_database, cur_schema]
         # }
-        print("")
         # result_set1 = stmt.execute();
         total_statement = total_statement + 1
         i = i + 1
@@ -162,7 +164,10 @@ def retry_failed_statements(cursor, failed_statements):
     retry_list = failed_statements
     cur_schema = ''
     cur_database = ''
+    loop_no = 1
     while len(retry_list) > 0:
+        print("Retry failed statement loop #" + str(loop_no))
+        loop_no += 1
         for item in retry_list:
             if item["cur_database"] != cur_database:
                 cur_database = item["cur_database"]
@@ -173,9 +178,10 @@ def retry_failed_statements(cursor, failed_statements):
             try:
                 cursor.execute(item["statement"])
                 print("Retry succeeded --->" + item["statement"])
-            except e:
+            except snowflake.connector.errors.ProgrammingError as e:
                 item["error"] = str(e)
                 next_retry.append(item)
+                pass
         if len(retry_list) == len(next_retry):
             # this means no more statement can be run successfully
             return next_retry

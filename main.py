@@ -207,9 +207,9 @@ if crossrep.mode == 'DR' or crossrep.mode == 'DR_TEST':
     else:
         remaining_failures = failed_statements
     for item in remaining_failures:
-        print("\nDDL Statement failed ---->" + item["statement"])
-        print("Error: " + item["error"])
-
+        print("\n-------DDL Statement failed and cannot be retried  ---->")
+        print(item["statement"])
+        print("\n------- Error: " + item["error"])
 
     if cursor != None:
         cursor.close()
@@ -644,7 +644,7 @@ if args.parameter:
 
 if args.pipe :
     dbfname = args.pipe
-    sf = open(migHome + "scripts/ddl/32_create_pipes_DDL.sql","w") 
+    sf = open(migHome + "scripts/ddl/32_create_pipes_DDL.sql","w")
     try:
         
         if crossrep.mode == 'SNOWFLAKE' or crossrep.mode == 'CUSTOMER':
@@ -731,7 +731,7 @@ if args.snowhouse:
 if args.stage :
     ### create stages
     dbfname = args.stage
-    sf = open(migHome + "scripts/ddl/31_create_stages_DDL.sql","w") 
+    sf = open(migHome + "scripts/ddl/31_create_stages_DDL.sql","w")
     try:
         if crossrep.mode == 'SNOWFLAKE':
             crossrep.crStages(cursor)

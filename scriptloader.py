@@ -48,12 +48,74 @@ def upload_scripts(mode, filedict, cursor, failed_statements):
         build_ddl_statememts(mode, batch_id, contents, filename, cursor, failed_statements)
         f.close()
 
+def replace_semicolon_in_block(start_keyword, end_keyword, new_sql_text):
+    comment_end_index = 0
+    new_sql_text2 = ""
+    comment_start_index = new_sql_text.lower().find(start_keyword.lower(), comment_end_index)
+    while comment_start_index >= 0:
+        if comment_start_index > comment_end_index:
+            # save the left side of the start index
+            new_sql_text2 += new_sql_text[comment_end_index:comment_start_index]
+        comment_end_index = new_sql_text.lower().find(end_keyword.lower(), comment_start_index + len(start_keyword))
+        if comment_end_index > 0:
+            # replace all the ; in between start_keyword and end_keyword with "semicolon"
+            new_sql_text2 += new_sql_text[comment_start_index: comment_end_index].replace(";", "semicolon")
+            new_sql_text2 += end_keyword
+            comment_end_index += len(end_keyword)
+            comment_start_index = new_sql_text.lower().find(start_keyword.lower(), comment_end_index)
+        else:
+            print("Incomplete comment block, can't find */ before the end of line:")
+            print(new_sql_text[comment_start_index:])
+            comment_start_index = -1
+
+    # no start_keyword is found
+    # if comment_end_index == 0:
+    #     new_sql_text2 = new_sql_text
+    #else:
+    # adding the remaining text
+    new_sql_text2 += new_sql_text[comment_end_index:]
+
+    return new_sql_text2
+
+# limitation: if a line has --  then ; ..  It will be wrongly broken down
+# if there is a --, followed by /*, it might lead to the wrong results
+def get_statement_blocks(long_sql_text):
+    long_sql_text = long_sql_text.replace("if not exists IF NOT EXISTS", "IF NOT EXISTS")
+    # replacing "/*" or "*/" after the line with a symbol
+    stmts = long_sql_text.split("\n")
+    stmts2 = []
+
+    for stmt in stmts:
+        end_index = stmt.find("--")
+        if end_index >= 0:
+            # neutralize the /* */ that came after the --
+            # stmt = stmt[:end_index] + stmt[end_index:].replace("/*", "slash*").replace("*/", "*slash").replace(";", "semicolon")
+            stmt = stmt[:end_index] + stmt[end_index:].replace(";", "semicolon")
+        # put it back into the long string
+        stmts2.append(stmt)
+
+    new_sql_text = '\n'.join(stmts2)
+
+    new_sql_text = replace_semicolon_in_block("/*", "*/", new_sql_text)
+    new_sql_text = replace_semicolon_in_block("create procedure", "';\n", new_sql_text)
+    new_sql_text = replace_semicolon_in_block("create function", "';\n", new_sql_text)
+
+    statements = new_sql_text.split(";")
+    for i in range(len(statements)):
+        statements[i] = statements[i].replace("semicolon", ";")# .replace("slash*", "/*").replace("*slash", "*/"))
+    return statements
+
 
 def build_ddl_statememts(mode, batch_id, long_sql_text, file_path, cursor, failed_statements):
-    sql_statements = long_sql_text.split(";")
+    #spliting the file by ';'
+
+    sql_statements = get_statement_blocks(long_sql_text);
+
     retry_list = []
-    cur_database = ""
+    cur_database = os.path.basename(file_path).replace('01_dbDDL_', '').replace('.sql', '')
     cur_schema = ""
+    old_database = ""
+    old_schema = ""
     # table_keyword = "create TABLE if not exists "
     # schema_keyword = "create schema if not exists "
     # db_keyword = "create database if not exists "
@@ -69,13 +131,16 @@ def build_ddl_statememts(mode, batch_id, long_sql_text, file_path, cursor, faile
     grant_keyword = "grant "
     create_keyword = "create "
     create_or_replace_keyword = "create or replace "
+    create_or_replace_transient_keyword = "create or replace transient "
     alter_keyword = "alter "
     # use_keyword = "use "
     if_not_exists_keyword = " if not exists"
 
     total_statement = 0
-    i = 0;
-    while i < len(sql_statements)-1:
+    i = 0
+    partial_commment_block = ""
+    completed_comment_block = ""
+    while i < len(sql_statements) - 1:
         statement = sql_statements[i].lstrip()
         if len(statement) == 0:
             i = i + 1
@@ -91,12 +156,13 @@ def build_ddl_statememts(mode, batch_id, long_sql_text, file_path, cursor, faile
             statement = statement + "\n"
             while i + 1 < len(sql_statements):
                 i = i + 1
-                if sql_statements[i].lstrip().startswith(create_keyword):
+                if sql_statements[i].lstrip().lower().startswith(create_keyword):
                     i = i - 1
                     break
                 else:
                     statement = statement + sql_statements[i] + ";"
         else:
+            # removing double spacing
             statement = statement.replace("  ", " ")
 
             if statement.lower().startswith(use_db_keyword):
@@ -104,25 +170,34 @@ def build_ddl_statememts(mode, batch_id, long_sql_text, file_path, cursor, faile
                 cur_database = statement[len(use_db_keyword)::]
             elif statement.lower().startswith(use_schema_keyword):
                 statement_type = use_schema_keyword.upper()
+                cur_schema = statement[len(use_schema_keyword)::]
             elif statement.upper().startswith(create_secure_view_keyword):
                 statement_type = create_secure_view_keyword
+            elif statement.lower().startswith(create_or_replace_transient_keyword):
+                end_index = statement.lower().find(" ", len(create_or_replace_transient_keyword) + 1)
+                if end_index >= 0:
+                    remaining_str = statement[len(create_or_replace_transient_keyword):]
+                    if remaining_str.upper().startswith('DATABASE '):
+                        cur_database = remaining_str[len('DATABASE '):]
+                    elif remaining_str.upper().startswith('SCHEMA '):
+                        cur_schema = remaining_str[len('SCHEMA '):]
+                    statement_type = (create_or_replace_transient_keyword + statement[len(create_or_replace_transient_keyword):end_index]).upper()
+
             elif statement.lower().startswith(create_or_replace_keyword):
                 end_index = statement.lower().find(" ", len(create_or_replace_keyword) + 1)
                 if end_index >= 0:
                     statement_type = (create_or_replace_keyword + statement[len(create_or_replace_keyword):end_index]).upper()
-                if statement_type.find("TRANSIENT") > 0:
-                    statement_type = statement_type + " TABLE"
             elif statement.lower().startswith(grant_keyword):
-                end_index = statement.lower().find(" ", 6)
+                end_index = statement.lower().find(" ", len(grant_keyword) + 1)
                 if end_index >= 0:
-                    statement_type = (grant_keyword + statement[5:end_index]).upper()
+                    statement_type = (grant_keyword + statement[len(grant_keyword)+1:end_index]).upper()
             elif statement.lower().find(create_secure_view_keyword) > 0:
                 statement_type = "CREATE SECURE VIEW";
             elif statement.lower().startswith(create_keyword):
                 # find te keywords between "create " and " if not exists"
-                end_index = statement.lower().find(if_not_exists_keyword, 7)
+                end_index = statement.lower().find(if_not_exists_keyword, len(create_keyword) + 1)
                 if end_index >= 0:
-                    statement_type = (create_keyword + statement[6:end_index]).upper()
+                    statement_type = (create_keyword + statement[len(create_keyword):end_index]).upper()
             elif statement.lower().startswith(alter_keyword):
                 # find te keywords between "create " and " if not exists"
                 end_index = statement.lower().find(" ", 6)
@@ -133,6 +208,9 @@ def build_ddl_statememts(mode, batch_id, long_sql_text, file_path, cursor, faile
                 print(statement)
 
         try:
+            if len(completed_comment_block) > 0:
+                statement = completed_comment_block + statement
+                completed_comment_block = ""
             if mode == 'DR_TEST':
                 if statement_type == 'unknown':
                     failed_statements.append(
@@ -142,6 +220,15 @@ def build_ddl_statememts(mode, batch_id, long_sql_text, file_path, cursor, faile
                     print("------------------------ Statement found (" + str(total_statement+1) + ") ----------------------------")
                     print(statement)
             elif mode == 'DR':
+                # if cur_database != old_database:
+                #    cursor.execute("USE DATABASE " + cur_database)
+                #    # reset old schema so that it will execute USE SCHEMA
+                #    old_database = cur_database
+                #    old_schema = ''
+                #if cur_schema != old_schema:
+                #    cursor.execute("USE SCHEMA " + cur_schema)
+                #    old_schema = cur_schema
+
                 print("------------------------ Running Statement (" + str(total_statement+1) + ") ----------------------------")
                 print(statement)
                 cursor.execute(statement)
@@ -172,12 +259,15 @@ def retry_failed_statements(cursor, failed_statements):
             if item["cur_database"] != cur_database:
                 cur_database = item["cur_database"]
                 cursor.execute('USE DATABASE "' + cur_database + '"')
+                # reset old schema so that it will execute USE SCHEMA
+                cur_schema = ""
             if item["cur_schema"] != cur_schema:
                 cur_schema = item["cur_schema"]
                 cursor.execute('USE SCHEMA "' + cur_schema + '"')
             try:
+                print("Retry statement --->" + item["statement"])
                 cursor.execute(item["statement"])
-                print("Retry succeeded --->" + item["statement"])
+                print("Retry succeeded -!")
             except snowflake.connector.errors.ProgrammingError as e:
                 item["error"] = str(e)
                 next_retry.append(item)

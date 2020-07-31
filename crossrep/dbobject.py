@@ -116,11 +116,12 @@ def genDatabaseDDL ( dbname, of, cursor):
             #ddl=re.sub(r'\"([^:]+):.+',r'\1',ddl)
             #print('before ===> ' + ddl)
             #ddl=re.sub(r'create\s+(or\s+replace\s+)?(database|schema|table|view|materialized view|file format|function|sequence|procedure|materliazed view|external table|stage|pipe|stream|task)\s+',r'create \2 if not exists ',ddl,flags=re.MULTILINE|re.IGNORECASE)
-            ddl=re.sub(r'create\s+(or\s+replace\s+)?(table|view|materialized view|file format|function|sequence|procedure|external table|stage|pipe|stream|task)\s+',r'create \2 if not exists ',ddl,flags=re.MULTILINE|re.IGNORECASE)
-            ddl=re.sub(r'create\s+(or\s+replace\s+)?(database|schema)\s+(\S+)(\s+)?;',r'create \2 if not exists \3;\n use \2 \3;',ddl,flags=re.MULTILINE|re.IGNORECASE)
+            # new get_ddl will output with "if not exists", no need to replace any more, comment out line 120,121 (next 2 lines) and 124
+            #ddl=re.sub(r'create\s+(or\s+replace\s+)?(table|view|materialized view|file format|function|sequence|procedure|external table|stage|pipe|stream|task)\s+',r'create \2 if not exists ',ddl,flags=re.MULTILINE|re.IGNORECASE)
+            #ddl=re.sub(r'create\s+(or\s+replace\s+)?(database|schema)\s+(\S+)(\s+)?;',r'create \2 if not exists \3;\n use \2 \3;',ddl,flags=re.MULTILINE|re.IGNORECASE)
             # create VIEW if not exists S2.VIEW1 COPY GRANTS AS SELECT * FROM S1.TAB1;
             # remove COPY GRANTS on create view - not needed for newly created objects/grants
-            ddl=re.sub(r'create\s+(view if not exists)\s+(\S)+\s+(COPY GRANTS)\s+',r'create view if not exists \2 ',ddl,flags=re.MULTILINE|re.IGNORECASE)
+            #ddl=re.sub(r'create\s+(view if not exists)\s+(\S)+\s+(COPY GRANTS)\s+',r'create view if not exists \2 ',ddl,flags=re.MULTILINE|re.IGNORECASE)
             #print('after ===> ' + ddl)
             # FIELD_OPTIONALLY_ENCLOSED_BY = ''' ==> FIELD_OPTIONALLY_ENCLOSED_BY = ''''
             #ddl=re.sub(r'FIELD_OPTIONALLY_ENCLOSED_BY = \'\'\'',r'FIELD_OPTIONALLY_ENCLOSED_BY = "\'"',ddl,flags=re.MULTILINE|re.IGNORECASE)

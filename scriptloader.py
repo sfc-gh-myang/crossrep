@@ -121,6 +121,7 @@ def get_statement_blocks(long_sql_text):
     new_sql_text = replace_semicolon_in_block("create procedure", "';\n", new_sql_text, True)
     new_sql_text = replace_semicolon_in_block("create function", "';\n", new_sql_text, True)
     new_sql_text = replace_semicolon_in_block("/*", "*/", new_sql_text)
+    new_sql_text = replace_semicolon_in_block("'", "'", new_sql_text)
 
     statements = new_sql_text.split(";")
     for i in range(len(statements)):
@@ -270,7 +271,7 @@ def build_ddl_statememts(mode, batch_id, long_sql_text, file_path, cursor, faile
                 #if cur_schema != old_schema:
                 #    cursor.execute("USE SCHEMA " + cur_schema)
                 #    old_schema = cur_schema
-                if statement_type.find(" VIEW"):
+                if statement_type.find(" VIEW") > 0:
                     failed_statements.append(
                         {"statement_type": statement_type, "cur_database": cur_database, "cur_schema": cur_schema,
                          "statement": statement, "file_path": file_path})

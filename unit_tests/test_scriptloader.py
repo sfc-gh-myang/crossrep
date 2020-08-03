@@ -1,8 +1,10 @@
+import os
 from unittest import TestCase
 import scriptloader
 
 class Test_ScriptLoader(TestCase):
     def test_get_statement_blocks(self):
+        '''
         nothing_special = "nothing special;"
         statements = scriptloader.get_statement_blocks(nothing_special)
         if statements[0] != "nothing special":
@@ -23,6 +25,24 @@ class Test_ScriptLoader(TestCase):
         if statements[1] != '\n' + sp_bare[:-1]:
             self.fail("Failed: stored procedure not match, should be:\n\n" + sp_bare[:-1]
                       + "\nbut got:\n" + statements[1])
-        pass
+        '''
+
+        filedict = scriptloader.list_scripts("/Users/mlee/crossrep/", "ddl")
+        failedStatements = []
+        for file_obj in filedict:
+            filename = os.path.join(file_obj['path'], file_obj['file'])
+            print("---- Reading File: %s" % (filename))
+            f = open(filename, "r")
+            long_sql_text = f.read()
+            f.close()
+            sql_statements = scriptloader.get_statement_blocks(long_sql_text);
+            for statement in sql_statements:
+                # count number of create statements
+                statement = statement.upper()
+                res = [i for i in range(len(statement)) if statement.startswith("CREATE ", i)]
+                if len(res) > 1:
+                    failedStatements.append({"file name": filename, "statement": statement})
+                    print("---- File: %s \n Found %d in statement \n %s" % (filename, len(res), statement))
+
 
 

@@ -238,48 +238,50 @@ def build_ddl_statememts(mode, batch_id, long_sql_text, file_path, cursor, faile
                     statement = statement + sql_statements[i] + ";"
         else:
             # removing all the double spacing
-            statement_without_double_spacing = statement.upper()
-            while statement_without_double_spacing.find("  ") >= 0:
-                statement_without_double_spacing = statement_without_double_spacing.replace("  ", " ")
+            stmt_wo_double_spacing = statement.upper()
+            original_stmt_wo_double_spacing = statement
+            while stmt_wo_double_spacing.find("  ") >= 0:
+                stmt_wo_double_spacing = stmt_wo_double_spacing.replace("  ", " ")
 
-            if statement_without_double_spacing.startswith(use_db_keyword):
+            if stmt_wo_double_spacing.startswith(use_db_keyword):
                 statement_type = use_db_keyword
-                cur_database = statement_without_double_spacing[len(use_db_keyword)::]
-            elif statement_without_double_spacing.startswith(use_schema_keyword):
+                cur_database = original_stmt_wo_double_spacing[len(use_db_keyword)::]
+            elif stmt_wo_double_spacing.startswith(use_schema_keyword):
                 statement_type = use_schema_keyword
-                cur_schema = statement_without_double_spacing[len(use_schema_keyword)::]
-            elif statement_without_double_spacing.startswith(create_secure_view_keyword):
+                cur_schema = original_stmt_wo_double_spacing[len(use_schema_keyword)::]
+            elif stmt_wo_double_spacing.startswith(create_secure_view_keyword):
                 statement_type = create_secure_view_keyword
-            elif statement_without_double_spacing.startswith(create_or_replace_transient_keyword):
-                end_index = statement_without_double_spacing.find(" ", len(create_or_replace_transient_keyword) + 1)
+            elif stmt_wo_double_spacing.startswith(create_or_replace_transient_keyword):
+                end_index = stmt_wo_double_spacing.find(" ", len(create_or_replace_transient_keyword) + 1)
                 if end_index >= 0:
-                    remaining_str = statement_without_double_spacing[len(create_or_replace_transient_keyword):]
+                    remaining_str = original_stmt_wo_double_spacing[len(create_or_replace_transient_keyword):]
                     if remaining_str.startswith('DATABASE '):
                         cur_database = remaining_str[len('DATABASE '):]
                     elif remaining_str.startswith('SCHEMA '):
                         cur_schema = remaining_str[len('SCHEMA '):]
-                    statement_type = (create_or_replace_transient_keyword + statement_without_double_spacing[len(create_or_replace_transient_keyword):end_index]).upper()
+                        statement_type = (create_or_replace_transient_keyword + stmt_wo_double_spacing[len(
+                            create_or_replace_transient_keyword):end_index]).upper()
 
-            elif statement_without_double_spacing.startswith(create_or_replace_keyword):
-                end_index = statement_without_double_spacing.find(" ", len(create_or_replace_keyword) + 1)
+            elif stmt_wo_double_spacing.startswith(create_or_replace_keyword):
+                end_index = stmt_wo_double_spacing.find(" ", len(create_or_replace_keyword) + 1)
                 if end_index >= 0:
-                    statement_type = (create_or_replace_keyword + statement_without_double_spacing[len(create_or_replace_keyword):end_index]).upper()
-            elif statement_without_double_spacing.startswith(grant_keyword):
-                end_index = statement_without_double_spacing.find(" ", len(grant_keyword) + 1)
+                    statement_type = (create_or_replace_keyword + stmt_wo_double_spacing[len(create_or_replace_keyword):end_index]).upper()
+            elif stmt_wo_double_spacing.startswith(grant_keyword):
+                end_index = stmt_wo_double_spacing.find(" ", len(grant_keyword) + 1)
                 if end_index >= 0:
-                    statement_type = (grant_keyword + statement_without_double_spacing[len(grant_keyword)+1:end_index]).upper()
-            elif statement_without_double_spacing.find(create_secure_view_keyword) > 0:
+                    statement_type = (grant_keyword + stmt_wo_double_spacing[len(grant_keyword)+1:end_index]).upper()
+            elif stmt_wo_double_spacing.find(create_secure_view_keyword) > 0:
                 statement_type = "CREATE SECURE VIEW";
-            elif statement_without_double_spacing.startswith(create_keyword):
+            elif stmt_wo_double_spacing.startswith(create_keyword):
                 # find te keywords between "create " and " if not exists"
-                end_index = statement_without_double_spacing.find(if_not_exists_keyword, len(create_keyword) + 1)
+                end_index = stmt_wo_double_spacing.find(if_not_exists_keyword, len(create_keyword) + 1)
                 if end_index >= 0:
-                    statement_type = (create_keyword + statement_without_double_spacing[len(create_keyword):end_index]).upper()
-            elif statement_without_double_spacing.startswith(alter_keyword):
+                    statement_type = (create_keyword + stmt_wo_double_spacing[len(create_keyword):end_index]).upper()
+            elif stmt_wo_double_spacing.startswith(alter_keyword):
                 # find te keywords between "create " and " if not exists"
-                end_index = statement_without_double_spacing.find(" ", 6)
+                end_index = stmt_wo_double_spacing.find(" ", 6)
                 if end_index >= 0:
-                    statement_type = create_keyword + statement_without_double_spacing[5:end_index]
+                    statement_type = create_keyword + stmt_wo_double_spacing[5:end_index]
             else:
                 #'GRANT  READ ON STAGE ABI_WH.HIGH_END_SRCE_S.HE_FLOAD_STAGE TO ROLE ABI_MOBILIZE_BTEQ_DEV'
                 print(statement)
@@ -330,29 +332,39 @@ def retry_failed_statements(cursor, failed_statements):
     cur_schema = ''
     cur_database = ''
     loop_no = 1
+
     retry_sequence = ['SEQUENCE', 'FILE FORMAT', 'TABLE', 'VIEW', 'STAGE', 'PIPE', 'PROCEDURE', 'FUNCTION', 'STREAM', 'TASK', '']
     while len(retry_list) > 0:
+        loop_no += 1
+        print("Retry failed statement loop #" + str(loop_no))
         for selected_type in retry_sequence:
-            print("Retry failed statement loop #" + str(loop_no))
-            loop_no += 1
             for item in retry_list:
-                if selected_type == '' or item.statement_type.upper().contains(selected_type) and not item["success"]:
-                    if item["cur_database"] != cur_database:
-                        cur_database = item["cur_database"]
-                        cursor.execute('USE DATABASE "' + cur_database + '"')
-                        # reset old schema so that it will execute USE SCHEMA
-                        cur_schema = ""
-                    if item["cur_schema"] != cur_schema:
-                        cur_schema = item["cur_schema"]
-                        cursor.execute('USE SCHEMA "' + cur_schema + '"')
+                if "cur_database" not in item.keys() or "cur_schema" not in item.keys() or "statement" not in item.keys() or "statement_type" not in item.keys():
+                    # ignore the bad items
+                    continue
+                statement_type = item["statement_type"].upper()
+
+                if (selected_type == '' or statement_type.find(selected_type) > 0) and not item["success"]:
+                    item["current_loop"] = loop_no
                     try:
+
+                        if item["cur_database"] != cur_database:
+                            cur_database = item["cur_database"]
+                            cursor.execute('USE DATABASE "' + cur_database + '"')
+                            # reset old schema so that it will execute USE SCHEMA
+                            cur_schema = ""
+                        if item["cur_schema"] != cur_schema:
+                            cur_schema = item["cur_schema"]
+                            cursor.execute('USE SCHEMA ' + cur_schema)
+
                         print("-----Retry statement --->\n" + item["statement"])
                         cursor.execute(item["statement"])
                         print("-----Retry succeeded -!")
                         item["success"] = True
                     except snowflake.connector.errors.ProgrammingError as e:
                         item["error"] = str(e)
-                        next_retry.append(item)
+                        if item not in next_retry:
+                            next_retry.append(item)
                         pass
         if len(retry_list) == len(next_retry):
             # this means no more statement can be run successfully
@@ -360,4 +372,4 @@ def retry_failed_statements(cursor, failed_statements):
         else:
             retry_list = next_retry
             next_retry = []
-    return next_retry
+    return retry_list

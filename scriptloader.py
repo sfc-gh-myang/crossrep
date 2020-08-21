@@ -36,7 +36,7 @@ def list_scripts(migHome, objectType = ''):
     return sorted(list, key = lambda i: i['file'])
 
 
-def upload_scripts(mode, filedict, cursor, failed_statements):
+def upload_scripts(mode, filedict, cursor, failed_statements, verbose):
     # open file
     filename = os.path.join(filedict['path'], filedict['file'])
     print("--------------------------------------------------")
@@ -46,14 +46,17 @@ def upload_scripts(mode, filedict, cursor, failed_statements):
     print("Script file read, size = " + str(len(contents)))
     batch_id = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     # cursor.execute("CALL mei_db_crossrep.mei_tgt_crossrep.parse_sql_script(%s, %s, %s)" % (batch_id, filename, contents))
-    build_ddl_statememts(mode, batch_id, contents, filename, cursor, failed_statements)
+    build_ddl_statememts(mode, batch_id, contents, filename, cursor, failed_statements, verbose)
     f.close()
 
 def search_for_code_block(start_keyword, end_keyword, new_sql_text, check_for_create_after=False):
     comment_end_index = 0
     new_sql_text2 = ""
-
-
+    sp_or_func = 0
+    if start_keyword.lower().startswith(
+        "create procedure") or start_keyword.lower().startswith(
+        "create function"):
+        sp_or_func = 1
 
     comment_start_index = new_sql_text.lower().find(start_keyword.lower(), comment_end_index)
     while comment_start_index >= 0:
@@ -65,31 +68,30 @@ def search_for_code_block(start_keyword, end_keyword, new_sql_text, check_for_cr
         comment_end_index = new_sql_text.lower().find(end_keyword.lower(), comment_start_index + len(start_keyword))
         # check for false ending
         while check_for_create_after == 1 and comment_end_index > 0:
-            remaining_text = new_sql_text.lower()[comment_end_index + len(end_keyword)::].lstrip()
-            if remaining_text.startswith('create') or len(remaining_text) == 0:
+            remaining_text = new_sql_text.lower()[comment_end_index + len(end_keyword)::]
+            if remaining_text.lstrip().startswith('create') or len(remaining_text) == 0:
                 break;
                 # find the next index
             comment_end_index = new_sql_text.lower().find(end_keyword.lower(), comment_end_index + len(end_keyword))
 
-        text_block = new_sql_text[comment_start_index + len(start_keyword): comment_end_index]
-        if comment_end_index > 0:
-            # replace all the ; in between start_keyword and end_keyword with "semicolon"
 
+        if comment_end_index > 0:
+            text_block = new_sql_text[comment_start_index + len(start_keyword): comment_end_index]
+            # replace all the ; in between start_keyword and end_keyword with "semicolon"
             text_block = safeguard_text_block(text_block,
-                                              (start_keyword.lower().startswith(
-                                                  "create procedure") or start_keyword.lower().startswith(
-                                                  "create function")))
+                                              sp_or_func)
             new_sql_text2 += start_keyword + text_block
+            if sp_or_func == 1:
+                new_sql_text2 += '\n'
             new_sql_text2 += end_keyword
             comment_end_index += len(end_keyword)
             comment_start_index = new_sql_text.lower().find(start_keyword.lower(), comment_end_index)
 
         else:
-            print("Incomplete comment block, can't find [%s] before the end of line:", end_keyword)
-            print(new_sql_text[comment_start_index:])
-            new_sql_text2 += start_keyword + safeguard_text_block(text_block, (start_keyword.lower().startswith(
-                                               "create procedure") or start_keyword.lower().startswith(
-                                               "create function")))
+            # print("Incomplete comment block, can't find [%s] before the end of line:" % end_keyword)
+            # print(new_sql_text[comment_start_index:])
+            text_block = new_sql_text[comment_start_index + len(start_keyword):]
+            new_sql_text2 += start_keyword + safeguard_text_block(text_block[:-1], sp_or_func)
             comment_start_index = -1
 
     # no start_keyword is found
@@ -103,27 +105,32 @@ def search_for_code_block(start_keyword, end_keyword, new_sql_text, check_for_cr
 
 
 def safeguard_text_block(text_block, is_in_javascript):
-    create_str = re.compile("create ", re.IGNORECASE)
-    text_block = text_block.replace(";", "semicolon")
-    text_block = create_str.sub("CCRREEAATTEE ", text_block)
+
     if (is_in_javascript):
         text_block = neutralize_line_after_comments(text_block, "//")
         text_block = replace_semicolon_in_block(text_block, "`")
         text_block = replace_semicolon_in_block(text_block, '"')
+        text_block = replace_semicolon_in_block(text_block, "''")
+    else:
+        text_block = replace_semicolon_in_block(text_block, "$$")
+    text_block = text_block.replace(";", "semicolon")
+    create_str = re.compile("create ", re.IGNORECASE)
+    text_block = create_str.sub("CCRREEAATTEE ", text_block)
     return text_block
 
 
 def neutralize_line_after_comments(long_sql_text, comment_indicator):
     stmts = long_sql_text.split("\n")
     stmts2 = []
-
+    create_str = re.compile("create ", re.IGNORECASE)
     for stmt in stmts:
         end_index = stmt.find(comment_indicator)
         if end_index >= 0:
             # neutralize the /* */ that came after the --
             # stmt = stmt[:end_index] + stmt[end_index:].replace("/*", "slash*").replace("*/", "*slash").replace(";", "semicolon")
-            stmt = stmt[:end_index] + stmt[end_index:].replace(";", "semicolon").replace("/*", 'slash*').replace("*/",
-                                                                                                                 "*slash").replace('CCRREEAATTEE ', 'CREATE ')
+            text_block = stmt[end_index:].replace(";", "semicolon").replace("/*", 'slash*').replace("*/", "*slash").replace("'","singlequote")
+            text_block = create_str.sub("CCRREEAATTEE ", text_block)
+            stmt = stmt[:end_index] + text_block
         # put it back into the long string
         stmts2.append(stmt)
 
@@ -138,30 +145,31 @@ def neutralize_line_after_comments(long_sql_text, comment_indicator):
 def get_statement_blocks(long_sql_text):
     long_sql_text = long_sql_text.replace("if not exists IF NOT EXISTS", "IF NOT EXISTS")
     # replacing "/*" or "*/" after the line with a symbol
-    new_sql_text = neutralize_line_after_comments(long_sql_text, "--")
 
-    new_sql_text = search_for_code_block("create procedure", "';\n", new_sql_text, True)
+
+    new_sql_text = search_for_code_block("create procedure", "';\n", long_sql_text, True)
     new_sql_text = search_for_code_block("create function", "';\n", new_sql_text, True)
+    new_sql_text = neutralize_line_after_comments(new_sql_text, "--")
     new_sql_text = search_for_code_block("/*", "*/", new_sql_text)
     new_sql_text = replace_semicolon_in_block(new_sql_text, "'")
 
     statements = new_sql_text.split(";")
     for i in range(len(statements)):
-        statements[i] = statements[i].replace("semicolon", ";").replace('CCRREEAATTEE ', 'CREATE ')# .replace("slash*", "/*").replace("*slash", "*/"))
+        statements[i] = statements[i].replace("semicolon", ";").replace("singlequote","'").replace('CCRREEAATTEE ', 'CREATE ').replace("slash*", "/*").replace("*slash", "*/")
     return statements
 
 
 def replace_semicolon_in_block(new_sql_text, block_keyword):
-    single_quote_tokens = new_sql_text.split(block_keyword)
+    splited_tokens = new_sql_text.split(block_keyword)
     start_index = 0
     if len(new_sql_text) > 0 and new_sql_text.startswith(block_keyword) == False:
         # all the even number of tokens are in single quotes
         start_index = 1
-    for x in range(start_index, len(single_quote_tokens), 2):
-        single_quote_tokens[x] = single_quote_tokens[x].replace(';', "semicolon")
-    result = block_keyword.join(single_quote_tokens)
-    if result != new_sql_text:
-        print("replaced semicolon in block %s" % new_sql_text)
+    for x in range(start_index, len(splited_tokens), 2):
+        splited_tokens[x] = splited_tokens[x].replace(';', "semicolon")
+    result = block_keyword.join(splited_tokens)
+    # if result != new_sql_text:
+    #    print("replaced semicolon in block %s" % new_sql_text)
     return result
 
 
@@ -181,7 +189,7 @@ def add_quotes_around_columns(statement):
 
 
 
-def build_ddl_statememts(mode, batch_id, long_sql_text, file_path, cursor, failed_statements):
+def build_ddl_statememts(mode, batch_id, long_sql_text, file_path, cursor, failed_statements, verbose=False):
     #spliting the file by ';'
 
     sql_statements = get_statement_blocks(long_sql_text);
@@ -238,53 +246,54 @@ def build_ddl_statememts(mode, batch_id, long_sql_text, file_path, cursor, faile
                     statement = statement + sql_statements[i] + ";"
         else:
             # removing all the double spacing
-            stmt_wo_double_spacing = statement.upper()
-            original_stmt_wo_double_spacing = statement
-            while stmt_wo_double_spacing.find("  ") >= 0:
-                stmt_wo_double_spacing = stmt_wo_double_spacing.replace("  ", " ")
+            stmt_upper = statement.upper()
+            stmt_original = statement
+            while stmt_upper.find("  ") >= 0:
+                stmt_upper = stmt_upper.replace("  ", " ")
 
-            if stmt_wo_double_spacing.startswith(use_db_keyword):
+            if stmt_upper.startswith(use_db_keyword):
                 statement_type = use_db_keyword
-                cur_database = original_stmt_wo_double_spacing[len(use_db_keyword)::]
-            elif stmt_wo_double_spacing.startswith(use_schema_keyword):
+                cur_database = stmt_original[len(use_db_keyword)::]
+            elif stmt_upper.startswith(use_schema_keyword):
                 statement_type = use_schema_keyword
-                cur_schema = original_stmt_wo_double_spacing[len(use_schema_keyword)::]
-            elif stmt_wo_double_spacing.startswith(create_secure_view_keyword):
+                cur_schema = stmt_original[len(use_schema_keyword)::]
+            elif stmt_upper.startswith(create_secure_view_keyword):
                 statement_type = create_secure_view_keyword
-            elif stmt_wo_double_spacing.startswith(create_or_replace_transient_keyword):
-                end_index = stmt_wo_double_spacing.find(" ", len(create_or_replace_transient_keyword) + 1)
+            elif stmt_upper.startswith(create_or_replace_transient_keyword):
+                end_index = stmt_upper.find(" ", len(create_or_replace_transient_keyword) + 1)
                 if end_index >= 0:
-                    remaining_str = original_stmt_wo_double_spacing[len(create_or_replace_transient_keyword):]
+                    remaining_str = stmt_original[len(create_or_replace_transient_keyword):]
                     if remaining_str.startswith('DATABASE '):
                         cur_database = remaining_str[len('DATABASE '):]
                     elif remaining_str.startswith('SCHEMA '):
                         cur_schema = remaining_str[len('SCHEMA '):]
-                        statement_type = (create_or_replace_transient_keyword + stmt_wo_double_spacing[len(
+                        statement_type = (create_or_replace_transient_keyword + stmt_upper[len(
                             create_or_replace_transient_keyword):end_index]).upper()
 
-            elif stmt_wo_double_spacing.startswith(create_or_replace_keyword):
-                end_index = stmt_wo_double_spacing.find(" ", len(create_or_replace_keyword) + 1)
+            elif stmt_upper.startswith(create_or_replace_keyword):
+                end_index = stmt_upper.find(" ", len(create_or_replace_keyword) + 1)
                 if end_index >= 0:
-                    statement_type = (create_or_replace_keyword + stmt_wo_double_spacing[len(create_or_replace_keyword):end_index]).upper()
-            elif stmt_wo_double_spacing.startswith(grant_keyword):
-                end_index = stmt_wo_double_spacing.find(" ", len(grant_keyword) + 1)
+                    statement_type = (create_or_replace_keyword + stmt_upper[len(create_or_replace_keyword):end_index]).upper()
+            elif stmt_upper.startswith(grant_keyword):
+                end_index = stmt_upper.find(" ", len(grant_keyword) + 1)
                 if end_index >= 0:
-                    statement_type = (grant_keyword + stmt_wo_double_spacing[len(grant_keyword)+1:end_index]).upper()
-            elif stmt_wo_double_spacing.find(create_secure_view_keyword) > 0:
+                    statement_type = (grant_keyword + stmt_upper[len(grant_keyword)+1:end_index]).upper()
+            elif stmt_upper.find(create_secure_view_keyword) > 0:
                 statement_type = "CREATE SECURE VIEW";
-            elif stmt_wo_double_spacing.startswith(create_keyword):
+            elif stmt_upper.startswith(create_keyword):
                 # find te keywords between "create " and " if not exists"
-                end_index = stmt_wo_double_spacing.find(if_not_exists_keyword, len(create_keyword) + 1)
+                end_index = stmt_upper.find(if_not_exists_keyword, len(create_keyword) + 1)
                 if end_index >= 0:
-                    statement_type = (create_keyword + stmt_wo_double_spacing[len(create_keyword):end_index]).upper()
-            elif stmt_wo_double_spacing.startswith(alter_keyword):
+                    statement_type = (create_keyword + stmt_upper[len(create_keyword):end_index]).upper()
+            elif stmt_upper.startswith(alter_keyword):
                 # find te keywords between "create " and " if not exists"
-                end_index = stmt_wo_double_spacing.find(" ", 6)
+                end_index = stmt_upper.find(" ", 6)
                 if end_index >= 0:
-                    statement_type = create_keyword + stmt_wo_double_spacing[5:end_index]
+                    statement_type = create_keyword + stmt_upper[5:end_index]
             else:
                 #'GRANT  READ ON STAGE ABI_WH.HIGH_END_SRCE_S.HE_FLOAD_STAGE TO ROLE ABI_MOBILIZE_BTEQ_DEV'
-                print(statement)
+                if verbose:
+                    print(statement)
 
         try:
             ''' if len(completed_comment_block) > 0:
@@ -308,9 +317,10 @@ def build_ddl_statememts(mode, batch_id, long_sql_text, file_path, cursor, faile
                         {"statement_type": statement_type, "cur_database": cur_database, "cur_schema": cur_schema,
                          "statement": statement, "file_path": file_path, "success": False})
                 else:
-                    print('------------------------ Running Statement (%d of %d) ------------------' %
-                          (total_statement + 1, len(sql_statements)))
-                    print(statement)
+                    if verbose:
+                        print('------------------------ Running Statement (%d of %d) ------------------' %
+                              (total_statement + 1, len(sql_statements)))
+                        print(statement)
                     cursor.execute(statement)
         except snowflake.connector.errors.ProgrammingError as e:
             failed_statements.append({"statement_type": statement_type, "cur_database": cur_database, "cur_schema": cur_schema,
@@ -326,7 +336,7 @@ def build_ddl_statememts(mode, batch_id, long_sql_text, file_path, cursor, faile
         i = i + 1
 
 
-def retry_failed_statements(cursor, failed_statements):
+def retry_failed_statements(cursor, failed_statements, verbose=False):
     next_retry = []
     retry_list = failed_statements
     cur_schema = ''
@@ -336,7 +346,8 @@ def retry_failed_statements(cursor, failed_statements):
     retry_sequence = ['SEQUENCE', 'FILE FORMAT', 'TABLE', 'VIEW', 'STAGE', 'PIPE', 'PROCEDURE', 'FUNCTION', 'STREAM', 'TASK', '']
     while len(retry_list) > 0:
         loop_no += 1
-        print("Retry failed statement loop #" + str(loop_no))
+        if verbose:
+            print("Retry failed statement loop #" + str(loop_no))
         for selected_type in retry_sequence:
             for item in retry_list:
                 if "cur_database" not in item.keys() or "cur_schema" not in item.keys() or "statement" not in item.keys() or "statement_type" not in item.keys():
@@ -356,10 +367,13 @@ def retry_failed_statements(cursor, failed_statements):
                         if item["cur_schema"] != cur_schema:
                             cur_schema = item["cur_schema"]
                             cursor.execute('USE SCHEMA ' + cur_schema)
-
-                        print("-----Retry statement --->\n" + item["statement"])
+                        if verbose:
+                            print("-----Retry statement --->\n" + item["statement"])
+                        else:
+                            print("-- retry: %s ..." % item["statement"][:60])
                         cursor.execute(item["statement"])
-                        print("-----Retry succeeded -!")
+                        if verbose:
+                            print("----- succeeded -!")
                         item["success"] = True
                     except snowflake.connector.errors.ProgrammingError as e:
                         item["error"] = str(e)

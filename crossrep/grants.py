@@ -189,6 +189,8 @@ def quoteID(id):
 def remArgName(parm):
     parm=parm.strip()
     list = parm.split()
+    if len(list) < 2:
+        return parm
     return list[1]
 
 '''###function handling: ON FUNCTION NAME (NOT DB OR SC NAME QUALIFIER)
@@ -359,7 +361,8 @@ def grantAllOwners( excludePredicate, ofile, cursor):
         object_type = r[0]
         object_name = r[1]
         ownerRole = r[2]
-
+        if object_name.find("ABI_WH.CSDI_C.GET_INVALID_VIEWS()") >=0:
+            print("Found target")
         command_object_name = object_name
         command_object_type = object_type
 
@@ -369,7 +372,11 @@ def grantAllOwners( excludePredicate, ofile, cursor):
             continue
         elif object_type == 'FUNCTION' or object_type == 'PROCEDURE' :
             #if object_type == 'FUNCTION' and priv == 'USAGE':
-            command_object_name = quoteIdentifier(object_name,True)
+            colon_location = object_name.find(':')
+            if colon_location > 0:
+                command_object_name = quoteIdentifier(object_name[:colon_location], True) + object_name[colon_location:]
+            else:
+                command_object_name = quoteIdentifier(object_name,True)
             if crossrep.verbose == True:
                 print('function: '+ object_name + '; ' + command_object_name )
         else:

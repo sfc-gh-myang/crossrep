@@ -200,16 +200,16 @@ if crossrep.mode == 'DR' or crossrep.mode == 'DR_TEST':
     filelist  = scriptloader.list_scripts(migHome, "ddl")
     failed_statements = []
     for f in filelist:
-        scriptloader.upload_scripts(crossrep.mode, f, cursor, failed_statements)
+        scriptloader.upload_scripts(crossrep.mode, f, cursor, failed_statements, crossrep.verbose)
 
     if crossrep.mode == 'DR':
-        remaining_failures = scriptloader.retry_failed_statements(cursor, failed_statements)
+        remaining_failures = scriptloader.retry_failed_statements(cursor, failed_statements, crossrep.verbose)
     else:
         remaining_failures = failed_statements
     for item in remaining_failures:
         print("\n-------DDL Statement failed and cannot be retried  ---->")
         print(item["statement"])
-        print("\n------- Error: " + item["error"])
+        print("------- Error:\t" + item["error"])
 
     if cursor != None:
         cursor.close()

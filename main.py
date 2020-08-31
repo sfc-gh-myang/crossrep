@@ -117,7 +117,6 @@ parser.add_argument('-r', '--role', type=str,
 parser.add_argument('-stage', '--stage',type=str,
     help='create DDL for stage and grants on stages ')
 
-
 # user name - case sensitive
 parser.add_argument('-t', '--test', nargs='+', 
     help='generate DROP statement for testing purpose : user name ? ')
@@ -134,6 +133,9 @@ parser.add_argument('-val', '--validate', type=str,
 
 parser.add_argument('-w', '--warehouse', action='store_true', 
     help='Suspend all warehouses ')
+
+parser.add_argument('-replace', '--replace', action='store_true',
+    help='convert ddl code to create or replace (in DR mode),... ')
 
 ### user provide database lists for grants against
 ### no -l option will generate grants for all database
@@ -198,19 +200,26 @@ else:
 
 if crossrep.mode == 'DR' or crossrep.mode == 'DR_TEST':
     filelist  = scriptloader.list_scripts(migHome, "ddl")
+    ddl_option = scriptloader.USE_CREATE_IF_NOT_EXISTS
+
+    if args.replace:
+        ddl_option = scriptloader.USE_CREATE_OR_REPLACE
     failed_statements = []
     for f in filelist:
-        scriptloader.upload_scripts(crossrep.mode, f, cursor, failed_statements, crossrep.verbose)
+        scriptloader.upload_scripts(crossrep.mode, f, cursor, failed_statements, crossrep.verbose, ddl_option)
 
     if crossrep.mode == 'DR':
-        remaining_failures = scriptloader.retry_failed_statements(cursor, failed_statements, crossrep.verbose)
+        remaining_failures = scriptloader.retry_failed_statements(cursor, failed_statements, crossrep.verbose, crossrep.mode)
     else:
         remaining_failures = failed_statements
     for item in remaining_failures:
-        print("\n-------DDL Statement failed and cannot be retried  ---->")
-        print(item["statement"])
-        print("------- Error:\t" + item["error"])
-
+        if crossrep.mode == 'DR':
+            print("\n-------DDL Statement failed and cannot be retried  ---->")
+            print(item["statement"])
+            print("------- Error:\t" + item["error"])
+        elif crossrep.mode == 'DR_TEST':
+            print("\n-------DDL Statement   ---->")
+            print(item["statement"])
     if cursor != None:
         cursor.close()
 

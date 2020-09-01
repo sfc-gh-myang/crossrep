@@ -51,7 +51,7 @@ def format_ddl_with_create_or_replace(ddl):
 
 class TestGet_statement_blocks(TestCase):
     def test_get_statement_blocks(self):
-
+        '''
         ddl = re.sub(r'create\s+(or\s+replace\s+)?schema\s+(\S+)\s+(with\s+managed\s+access)',
                      r'create schema if not exists \2 with managed access;\n use \2 \3',
                      'CREATE OR replace schema abc  \n with managed access',
@@ -119,7 +119,7 @@ class TestGet_statement_blocks(TestCase):
                 cur_schema = m.groups()[4]
             statement_type = 'CREATE ' + m.groups(0).upper + statement_type
 
-
+        '''
         '''
         # pattern = r"\n*create\s*or\s*replace\s*(?P<object1>)\s*(?P<object2>)\s*(?P<object3>\w+)"
         pattern = pattern = r"\n*create\s+or\s+replace\s*(external)\s+(?P<object_type>\w+)\s+(?P<object_name>\w+)"
@@ -159,10 +159,13 @@ class TestGet_statement_blocks(TestCase):
             f = open(filename, "r")
             long_sql_text = f.read()
             f.close()
+
             sql_statements = scriptloader.get_statement_blocks(long_sql_text);
             failures = ''
 
             for statement in sql_statements:
+                if statement.find("semicolon") >= 0:
+                    assert()
                 upper_statement = statement.upper().lstrip()
                 if upper_statement.find('CREATE PROCEDURE') >= 0 or upper_statement.find('CREATE FUNCTION') >= 0:
                     continue

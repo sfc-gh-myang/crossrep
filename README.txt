@@ -365,4 +365,16 @@ For Customers only want to execute the DDL on the target account and not using r
   after the initial round and repeat the re-trying process untill no more successes can be achieve.  Errors will be reported.
 
   DR_TEST mode - similar to DR mode but it does not run the SQL statements, only output the statement one by one.  For testing purpose only.
-               - More test cases will be added after runnin on aws_cas2 environment
+
+  python main.py -m DR
+  or
+  python main.py -m DR_TEST
+  With DR and DR_TEST mode, additional optional parameter is -replace (or --replace).  This option can control whether to convert DDL script from "CREATE OR REPLACE" to "CREATE IF NOT EXISTS", or vice versa.  -replace stands for "CREATE OR REPLACE".  Without
+  it, it use convert the DDL script to CREATE IF NOT EXISTS.
+  python main.py -m DR
+  or
+  python main.py -m DR_TEST
+  or
+  python main.py -m DR -replace
+  or
+  python main.py -m DR_TEST -replace

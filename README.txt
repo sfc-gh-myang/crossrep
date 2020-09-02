@@ -365,3 +365,4 @@ For Customers only want to execute the DDL on the target account and not using r
   after the initial round and repeat the re-trying process untill no more successes can be achieve.  Errors will be reported.
 
   DR_TEST mode - similar to DR mode but it does not run the SQL statements, only output the statement one by one.  For testing purpose only.
+               - More test cases will be added after runnin on aws_cas2 environment

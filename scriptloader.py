@@ -284,14 +284,22 @@ def match_create_db_or_schema(statement, option, current_db_schema):
     statement_type = ''
     object_name = ''
     if option == USE_CREATE_IF_NOT_EXISTS:
-        m = re.match(r'create\s+(transient\s+)?(database|schema)\s+if\s+not\s+exists\s+(\S+)(\s+)?', statement,
+        # check if object name has double-quotes - doing it as a separate check to not break existing logic
+        m = re.match(r'create\s+(transient\s+)?(database|schema)\s+if\s+not\s+exists\s+(\".+?\")(\s+)?', statement,
+                     flags=re.MULTILINE | re.IGNORECASE)
+        if not m: 
+            m = re.match(r'create\s+(transient\s+)?(database|schema)\s+if\s+not\s+exists\s+(\S+)(\s+)?', statement,
                      flags=re.MULTILINE | re.IGNORECASE)
         if m:
             statement_type = str(m.groups()[1]).upper()
             object_name = m.groups()[2]
 
     else:
-        m = re.match(r'create\s+(or\s+replace\s+)?(transient\s+)?(database|schema)\s+(\S+)(\s+)?', statement,
+        # check if object name has double-quotes - doing it as a separate check to not break existing logic
+        m = re.match(r'create\s+(or\s+replace\s+)?(transient\s+)?(database|schema)\s+(\".+?\")(\s+)?', statement,
+                     flags=re.MULTILINE | re.IGNORECASE)
+        if not m:
+            m = re.match(r'create\s+(or\s+replace\s+)?(transient\s+)?(database|schema)\s+(\S+)(\s+)?', statement,
                      flags=re.MULTILINE | re.IGNORECASE)
         if m:
             statement_type = m.groups()[2].upper()
@@ -337,7 +345,6 @@ def build_ddl_statements(mode, batch_id, long_sql_text, file_path, cursor, faile
     completed_comment_block = ""
     while i < len(sql_statements) - 1:
         statement = sql_statements[i].lstrip()
-
         # Convert everything to use the same convention
         if option == USE_CREATE_OR_REPLACE:
             statement = use_create_or_replace_object(statement)
@@ -347,7 +354,6 @@ def build_ddl_statements(mode, batch_id, long_sql_text, file_path, cursor, faile
         if len(statement) == 0:
             i = i + 1
             continue
-
         statement_type = match_use_statements(statement, current_db_schema)
         if len(statement_type) == 0:
             statement_type = match_create_db_or_schema(statement, option, current_db_schema)
@@ -371,13 +377,13 @@ def build_ddl_statements(mode, batch_id, long_sql_text, file_path, cursor, faile
                          , total_statement
                          , cursor)
         if statement_type == 'CREATE DATABASE':
-            sql_text = "USE DATABASE " + current_db_schema["DATABASE"]
+            sql_text = 'USE DATABASE ' + current_db_schema["DATABASE"]
             if mode == 'DR_TEST':
                 print(sql_text)
             elif mode == 'DR':
                 cursor.execute(sql_text)
-        elif statement_type == 'CREATE SCHEMA':
-            sql_text = "USE SCHEMA " + current_db_schema["SCHEMA"]
+        elif statement_type == 'CREATE SCHEMA': 
+            sql_text = 'USE SCHEMA ' + current_db_schema["SCHEMA"]
             if mode == 'DR_TEST':
                 print(sql_text)
             elif mode == 'DR':
@@ -451,3 +457,4 @@ def upload_scripts(mode, filedict, cursor, failed_statements, verbose, option=US
     # cursor.execute("CALL mei_db_crossrep.mei_tgt_crossrep.parse_sql_script(%s, %s, %s)" % (batch_id, filename, contents))
     build_ddl_statements(mode, batch_id, contents, filename, cursor, failed_statements, verbose, option)
     f.close()
+

@@ -60,7 +60,7 @@ parser.add_argument('-c', '--create', type=str,
 
 ### generate grants of ownership and privileges for databases with input parm: file name or 'all' or nothing(default) of Database
 parser.add_argument('-d', '--dbfile',  type=str,
-    help='a file name with database lists to grant or all databases (all) or nothing ')
+    help='a file name with database lists to grant for all databases (all) or database list in the file ')
 
 #parser.add_argument('-ddl', '--ddl',action='store_true', default=False,
 parser.add_argument('-ddl', '--ddl',type=str,
@@ -80,8 +80,10 @@ parser.add_argument('-sh', '--snowhouse',type=str,
 #parser.add_argument('-e', '--evaluate',action='store_true', default=False,
 #    help='evalute constraints/sequences in account ')
 
-parser.add_argument('-f', '--future', action='store_true', default=False,
-    help='generate future grants: True or False ?')
+#parser.add_argument('-f', '--future', action='store_true', default=False,
+#    help='generate future grants: True or False ?')
+parser.add_argument('-f', '--future', type=str,default='all',
+    help='generate future grants for all databases (all) or database list in the file?')
 
 parser.add_argument('-fr', '--freeze',action='store_true', default=False,
     help=' In order to freeze account , generating command to disable all users or suspend warehouse . ')
@@ -166,7 +168,10 @@ if args.verbose:
 #print('mode: '+ crossrep.mode + '; args.mode:' + args.mode) 
 if args.mode != None and args.mode != crossrep.mode :
     crossrep.mode = args.mode
-    
+else: 
+    # if mode is emtpy, set it to default CUSTOMER mode
+    crossrep.mode = 'CUSTOMER'
+
 setDefaultEnv(crossrep.mode) 
 print(crossrep.default_acct)
 print(crossrep.default_usr)
@@ -224,7 +229,6 @@ if crossrep.mode == 'DR' or crossrep.mode == 'DR_TEST':
         cursor.close()
 
     sys.exit()
-
 
 if crossrep.mode == 'CUSTOMER':
     cursor.execute("CREATE DATABASE IF NOT EXISTS "+crossrep.default_db)
@@ -300,6 +304,7 @@ if args.create:
             crossrep.crShares( cursor)
             crossrep.crDatabase ( cursor)
             crossrep.crTable_DefaultSequence ( cursor)
+            crossrep.crFGrant(cursor)
             
             if crossrep.mode == 'CUSTOMER':
                 crossrep.crNetworkPolicy( cursor)
@@ -469,13 +474,27 @@ if args.evaluate:
         print('An error occured during evaluating/reporting constraints/sequences/ext-table/MV :' + str(err) )
         #pass
 
-# -f option: generating future grants
+# -f option: generating future grants; all/empty: all database; dbfile: database list in dbfile, one file per line
 if args.future:
     ### grant future grants
     ff = open(migHome + "scripts/rbac/27_future_grants.sql","w") 
     try:
-        crossrep.crFGrant(cursor)
-        crossrep.grantFutureObj( ff, cursor)
+        #crossrep.crFGrant(cursor)
+        #crossrep.grantFutureObj( ff, cursor)
+        dbfuture = args.future  
+        dblist = []
+
+        if dbfuture == 'all' or crossrep.isBlank(dbfuture) == True :
+            if crossrep.verbose:
+                print('generate future grants for all databases ')
+        else:
+            dbfilepath = migHome + dbfuture
+            dblist = crossrep.readFile(dbfilepath)
+            if crossrep.verbose:
+                print('dbfile path/name: '+dbfilepath)
+                print(dblist)
+        
+        crossrep.grantFutureObj( dblist, ff, cursor)
     except Exception as err:
         print('An error occured during generating future grants :' + str(err) )
         #pass

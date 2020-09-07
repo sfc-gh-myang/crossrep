@@ -24,8 +24,10 @@ Command options description in python main.py -x where -x in one of the followin
       filename: file contains the list of databases whose DDLs need to be created, one line per database in the file. 
   -e num:       to generate report, alter/drop/ddl statement for reference objects that needs to be handled ahead of replication (cross-database referrenced and ID-based objects)
                 num is a version number to generate a different version file in case you need to execute multiple times so you don't override the previous generated files 
-  
-  -f:           to to generate future grants
+
+  -f all:       to to generate future grants on all database level objects
+      filename: file contains the list of databases to be generated future grants for
+
   -fr:          to disable and enable all users, suspend or resume warehouses when you want to use those commands to freeze your source account during cut-over time of switching source and target account  
   -g all:       to generate ALTER DATABASE ENABLE REPLICATION statements for all databases 
     filename:   file contains database list of which needs to be replicated, one line per database in the file 

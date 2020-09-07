@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 import crossrep,re
 """
-Created on March 27 2019
-Updated on July 2nd 2020
-only generate object: warehouse, network policy, resource monitor
+Created on March 27, 2019
+Updated on July 2, 2020
+Updated on Sept 5, 2020
 @author: Minzhen Yang
 """
 __author__ = 'Minzhen Yang, Advisory Services, Snowflake Computing'
@@ -519,13 +519,20 @@ def grantAllPrivs( excludePredicate, ofile, cursor):
 
 ### generating grant commands for future grants
 # tb_fgrant: future grant priv table for future grants information
+# dblist: database list whose future grants to be generated , empty list for all databases 
 # ofile: output file to store future grant commands 
 # cursor: connection to source snowflake account
-def grantFutureObj( ofile, cursor):
+def grantFutureObj (dblist, ofile, cursor):
+    inPredicate = ''
+
+    if len(dblist) != 0:
+        inPredicate = ','.join("'"+ dbname +"'" for dbname in dblist )
+        inPredicate = " and dbname  in (" + inPredicate + ") "
+
     gquery = ( "select distinct object_name, object_type, priv, grantee_name, grant_option from " + crossrep.tb_fgrant + 
-    " where priv in ('OWNERSHIP','SELECT', 'INSERT', 'UPDATE', 'DELETE', 'TRUNCATE', 'REFERENCES', 'USAGE', 'READ', 'WRITE')"
-    " and object_type in ('TABLE','VIEW', 'STAGE', 'FILE_FORMAT', 'FUNCTION', 'PROCEDURE', 'SEQUENCE')"
-    " order by object_name,  object_type ")
+    " where priv in ('OWNERSHIP','SELECT', 'INSERT', 'UPDATE', 'DELETE', 'TRUNCATE', 'REFERENCES', 'USAGE', 'READ', 'WRITE','REBUILD')"
+    " and object_type in ('TABLE','VIEW', 'STAGE', 'FILE_FORMAT', 'FUNCTION', 'PROCEDURE', 'SEQUENCE')" 
+    + inPredicate + " order by object_name,  object_type ")
     if crossrep.verbose==True:
         print(gquery)
     cursor.execute(gquery)

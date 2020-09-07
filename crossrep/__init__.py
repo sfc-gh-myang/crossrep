@@ -93,6 +93,23 @@ from .replication import linkGlobalDBsRepGroup
 from .replication import refreshGlobalDBs
 from .replication import repMonitor
 
+from .drloader import list_scripts
+from .drloader import search_for_procedure_or_function
+from .drloader import search_for_code_block
+from .drloader import safeguard_text_block
+from .drloader import neutralize_line_after_comments
+from .drloader import use_create_object_if_not_exists
+from .drloader import use_create_or_replace_object
+from .drloader import get_statement_blocks
+from .drloader import replace_semicolon_in_block
+from .drloader import try_handle_statement
+from .drloader import match_use_statements
+from .drloader import match_create_db_or_schema
+from .drloader import match_create_db_object
+from .drloader import build_ddl_statements
+from .drloader import retry_failed_statements
+from .drloader import upload_scripts
+
 def getEnv(name):
    if name in os.environ.keys():
       return os.environ[name]

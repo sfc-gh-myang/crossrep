@@ -1,6 +1,7 @@
 import os
 from unittest import TestCase
-import scriptloader
+#import scriptloader
+import crossrep
 
 class Test_ScriptLoader(TestCase):
     def test_get_statement_blocks(self):

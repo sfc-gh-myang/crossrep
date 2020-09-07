@@ -575,32 +575,36 @@ def crFGrant(cursor):
         scname = crossrep.acctpref_qualifier + dname+"."+sname
         if crossrep.verbose == True:
             print('schema '+ scname)
+            print('dname: ' + dname+"; sname:" + sname)
+
         cs.execute("begin")
         showq = ( "show future grants in schema "+ scname )
         if crossrep.verbose == True:
             print(showq)
-        cs.execute(showq)
-        cs.execute(" create or replace table " + tb_temp +
-            " as select distinct $1 created_at, $2 priv, $3 object_type , $4 object_name, $6 grantee_name, $7 grant_option from table(result_scan(last_query_id())) order by $1, $4 " )
-        cs.execute("commit")
-        
-        if  isCreated == False :
-            cs.execute(" create or replace table " + tbname +
-            " as select created_at,  priv, object_type , object_name, grantee_name, grant_option from " + tb_temp)
-            isCreated = True
-        else:
-            if isInsert == True:
-                # Process each insert in parallelized batches...
-                #t1 = threading.Thread(target=insPrivByRole, args=(tbpriv, tb_temp, ctx))
-                t1 = threading.Thread(target=insFGrant, args=(tbname, tb_temp, cursor))
-                t1.setDaemon(True)
-                t1.start()
+        rowcount = cs.execute(showq)
+        if ( rowcount != None):
+            cs.execute(" create or replace table " + tb_temp +
+                " as select distinct '"+dname+"' dbname, '"+sname+"' scname, $1 created_at, $2 priv, $3 object_type , $4 object_name, $6 grantee_name, $7 grant_option from table(result_scan(last_query_id())) order by $1, $4 " )
+            cs.execute("commit")
+            
+            if  isCreated == False :
+                cs.execute(" create or replace table " + tbname +
+                " as select dbname, scname, created_at,  priv, object_type , object_name, grantee_name, grant_option from " + tb_temp)
+                isCreated = True
             else:
-                t2 = threading.Thread(target=updFGrant, args=(tbname, tb_temp, scname,cursor))
-                #t2 = threading.Thread(target=updPriv, args=(tb_temp, role))
-                t2.setDaemon(True)
-                t2.start()
-                #updPriv(tbpriv, tb_temp, role)
+                if isInsert == True:
+                    # Process each insert in parallelized batches...
+                    #t1 = threading.Thread(target=insPrivByRole, args=(tbpriv, tb_temp, ctx))
+                    t1 = threading.Thread(target=insFGrant, args=(tbname, tb_temp, cursor))
+                    t1.setDaemon(True)
+                    t1.start()
+                else:
+                    t2 = threading.Thread(target=updFGrant, args=(tbname, tb_temp, dname, sname,cursor))
+                    #t2 = threading.Thread(target=updFGrant, args=(tbname, tb_temp, scname,cursor))
+                    #t2 = threading.Thread(target=updPriv, args=(tb_temp, role))
+                    t2.setDaemon(True)
+                    t2.start()
+                    #updPriv(tbpriv, tb_temp, role)
         
         main_thread = threading.currentThread()
         for t in threading.enumerate():
@@ -620,7 +624,7 @@ def crFGrant(cursor):
 # tb_temp: temp table storing the current ALL_FGRANTS information (real time)
 # cursor: cursor connects to your snowflake account where it creates tables to store metadata
 def insFGrant( tbname, tb_temp ,cursor):
-    cursor.execute("insert into " + tbname + " select created_at, priv, object_type , object_name, grantee_name, grant_option from " + tb_temp + " order by created_at, object_name") 
+    cursor.execute("insert into " + tbname + " select dbname, scname, created_at, priv, object_type , object_name, grantee_name, grant_option from " + tb_temp + " order by created_at, object_name") 
     cursor.execute("drop table if exists " + tb_temp)
     cursor.execute("commit ")
 
@@ -630,19 +634,20 @@ def insFGrant( tbname, tb_temp ,cursor):
 # tb_fgrant : ALL_FGRANTS table storing all future grants information
 # tb_temp: temp table storing the current ALL_FGRANTS information (real time)
 # cursor: cursor connects to your snowflake account where it creates tables to store metadata
-def updFGrant(tbname, tb_temp,scname,cursor):
+def updFGrant(tbname, tb_temp,dbname, scname,cursor):
     if crossrep.verbose == True:
         print('updating ALL_FGRANTS table')
 
     # delete the ones dropped
     dquery = ( "delete from " + tbname + " tgt using (" +
-        " select created_at, priv, object_type , object_name, grantee_name from "+ tbname  + " where object_name like '"+ scname + "%'" +
+        " select dbname, scname, created_at, priv, object_type , object_name, grantee_name from "+ tbname  + " where object_name like '"+ scname + "%'" +
         "                 minus " +
-        " select created_at, priv, object_type , object_name, grantee_name from "+tb_temp + 
+        " select dbname, scname, created_at, priv, object_type , object_name, grantee_name from "+tb_temp + 
         "  ) as src where tgt.priv = src.priv and tgt.object_type = src.object_type and tgt.object_name = src.object_name and tgt.grantee_name = src.grantee_name" )
-    iquery = ("insert into " + tbname + " select created_at, priv, object_type , object_name, grantee_name, grant_option from " + tb_temp +
+    iquery = ("insert into " + tbname + " select dbname, scname, created_at, priv, object_type , object_name, grantee_name, grant_option from " + tb_temp +
          " where created_at > (select IFNULL(max(created_at), TO_TIMESTAMP_LTZ('1900-01-01 00:00:00.000 -0000'))  from " + tbname+ 
-         " where object_name like '"+ scname + "%' ) order by object_name, object_type ")
+         " ) and  dbname = '" + dbname+ "' and scname = '"+ scname + "' order by object_name, object_type ")
+    #" where object_name like '"+ scname + "%' ) order by object_name, object_type ")
 
     if crossrep.verbose == True:
         print(dquery)

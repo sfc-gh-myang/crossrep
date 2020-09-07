@@ -1,0 +1,16 @@
+accountlist.txt
+enRep.py
+enableRep.py
+splitCopy.py
+genAuto.py
+genAutoELT.py
+monitor.py
+env_prodzeta.sh
+env_prodkargo.sh
+env_migration.sh
+env_mig.sh
+env_cas2.sh
+./prerep/taskdb.txt
+./prerep/prep-min.sql
+./scripts/*/*.sql
+./scripts/*/*.sql.out

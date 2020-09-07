@@ -1,5 +1,6 @@
 from unittest import TestCase
-import scriptloader
+#import scriptloader
+import crossrep
 
 class TestReplace_semicolon_in_block(TestCase):
     def test_get_statement_blocks(self):

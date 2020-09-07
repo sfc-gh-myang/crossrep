@@ -1,7 +1,8 @@
 from unittest import TestCase
-import scriptloader
+#import scriptloader
 import os
 import re
+import crossrep
 
 
 def format_ddl_with_create_if_not_exists(ddl):

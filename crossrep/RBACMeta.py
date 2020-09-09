@@ -584,7 +584,7 @@ def crFGrant(cursor):
         rowcount = cs.execute(showq)
         if ( rowcount != None):
             cs.execute(" create or replace table " + tb_temp +
-                " as select distinct '"+dname+"' dbname, '"+sname+"' scname, $1 created_at, $2 priv, $3 object_type , $4 object_name, $6 grantee_name, $7 grant_option from table(result_scan(last_query_id())) order by $1, $4 " )
+                " as select distinct '"+dname+"'::string dbname, '"+sname+"'::string scname, $1 created_at, $2 priv, $3 object_type , $4 object_name, $6 grantee_name, $7 grant_option from table(result_scan(last_query_id())) order by $1, $4 " )
             cs.execute("commit")
             
             if  isCreated == False :

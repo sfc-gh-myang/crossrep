@@ -80,6 +80,9 @@ def search_for_procedure_or_function(new_sql_text):
     if statement_end_index > 0:
         new_sql_text2 += new_sql_text[statement_end_index:]
 
+    if not m:
+        new_sql_text2 = new_sql_text
+
     return new_sql_text2
 
 

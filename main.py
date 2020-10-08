@@ -10,7 +10,7 @@ import snowflake.connector
 import os, re, string, subprocess, sys, time,getpass
 import crossrep
 from multiprocessing import Process
-import scriptloader
+import scriptloader_parallel as scriptloader
 
 def setDefaultEnv(mode):
     if mode == 'CUSTOMER':
@@ -128,6 +128,7 @@ parser.add_argument('-u', '--acctusage', action='store_true', default=False,
 
 parser.add_argument('-v', '--verbose', action='store_true', 
     help='printing more diagnotic information ')
+
 parser.add_argument('-val', '--validate', type=str,
     help='validating for row count and hash agg on tables with version : version control - 1,2,... ')
 
@@ -136,6 +137,9 @@ parser.add_argument('-w', '--warehouse', action='store_true',
 
 parser.add_argument('-replace', '--replace', action='store_true',
     help='convert ddl code to create or replace (in DR mode),... ')
+
+parser.add_argument('-parallel','--parallel', type=int, default=8, 
+    help='Enter number of threads to use for running DR scripts in DR mode')
 
 ### user provide database lists for grants against
 ### no -l option will generate grants for all database
@@ -200,18 +204,45 @@ else:
 
 if crossrep.mode == 'DR' or crossrep.mode == 'DR_TEST':
     filelist  = scriptloader.list_scripts(migHome, "ddl")
-    ddl_option = scriptloader.USE_CREATE_IF_NOT_EXISTS
+    #print(filelist)
+    tmp_dir = os.path.join(migHome,"tmp")
+    if not os.path.exists(tmp_dir):
+        os.makedirs(tmp_dir)
 
+    log_dir = os.path.join(migHome,"logs")
+    if not os.path.exists(log_dir):
+        os.makedirs(log_dir)
+
+    ddl_option = scriptloader.USE_CREATE_IF_NOT_EXISTS
     if args.replace:
         ddl_option = scriptloader.USE_CREATE_OR_REPLACE
     failed_statements = []
-    for f in filelist:
-        scriptloader.upload_scripts(crossrep.mode, f, cursor, failed_statements, crossrep.verbose, ddl_option)
 
-    if crossrep.mode == 'DR':
-        remaining_failures = scriptloader.retry_failed_statements(cursor, failed_statements, crossrep.verbose, crossrep.mode)
+    #for f in filelist:
+        #scriptloader.upload_scripts(crossrep.mode, f, cursor, failed_statements, crossrep.verbose, ddl_option)
+
+    #if crossrep.mode == 'DR':
+        #remaining_failures = scriptloader.retry_failed_statements(cursor, failed_statements, crossrep.verbose, crossrep.mode)
+    #else:
+        #remaining_failures = failed_statements
+    creds = {
+        "account":crossrep.default_acct,
+        "user":crossrep.default_usr,
+        "password":crossrep.default_pwd,
+        "warehouse":crossrep.default_wh,
+        "role":crossrep.default_rl
+    }
+    if args.parallel:
+        threads = args.parallel
     else:
-        remaining_failures = failed_statements
+        threads = 8
+
+    status_object = scriptloader.upload_multithreaded(
+        threads,crossrep.mode,ctx,creds,filelist,tmp_dir,log_dir,crossrep.verbose,continue_on_error=True, option=ddl_option)
+
+    #status_object = scriptloader.upload_with_stream(crossrep.mode, ctx, filelist, tmp_dir, crossrep.verbose, continue_on_error=True, option=ddl_option) 
+
+    remaining_failures = status_object['final_failed_statements']
     for item in remaining_failures:
         if crossrep.mode == 'DR':
             print("\n-------DDL Statement failed and cannot be retried  ---->")
@@ -220,11 +251,11 @@ if crossrep.mode == 'DR' or crossrep.mode == 'DR_TEST':
         elif crossrep.mode == 'DR_TEST':
             print("\n-------DDL Statement   ---->")
             print(item["statement"])
+    print("after printing all errors ")
     if cursor != None:
         cursor.close()
-
+    ctx.close()
     sys.exit()
-
 
 if crossrep.mode == 'CUSTOMER':
     cursor.execute("CREATE DATABASE IF NOT EXISTS "+crossrep.default_db)

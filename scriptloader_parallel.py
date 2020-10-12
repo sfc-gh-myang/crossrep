@@ -293,6 +293,7 @@ def retry_failed_statements(cursor, failed_statements, logger, verbose=False, mo
     retry_list = [item for item in failed_statements if item['statement'].strip() != ';']
     cur_schema = ''
     cur_database = ''
+    cur_query_tag = '' 
     current_db_schema = {}
     loop_no = 1
 
@@ -305,6 +306,9 @@ def retry_failed_statements(cursor, failed_statements, logger, verbose=False, mo
             logger.info("Retry statement loop #" + str(loop_no))
         for selected_type in retry_sequence:
             for item in retry_list:
+                if item['filename'] != cur_query_tag:
+                    cur_query_tag = item['filename']
+                    cursor.execute(f"ALTER SESSION SET QUERY_TAG='{cur_query_tag}-Retry {str(loop_no)}'")
                 if "cur_database" not in item.keys() or "cur_schema" not in item.keys() or "statement" not in item.keys() or "statement_type" not in item.keys():
                     # ignore the bad items
                     continue

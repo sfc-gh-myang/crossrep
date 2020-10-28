@@ -22,6 +22,35 @@ from copy import deepcopy
 USE_CREATE_IF_NOT_EXISTS = 1
 USE_CREATE_OR_REPLACE = 2
 
+def split_files_by_schema(tmp_dir, split_files_list, out_remove_files, out_add_files):
+    for file_name in split_files_list:
+        file_name_wo_ext = file_name[0:file_name.find('.')]
+        file_contents = ''
+        file_content_array = []
+        file_db_name = file_name_wo_ext.replace('01_dbDDL_','')
+        # read the file and split it by 'create or replace schema'
+        with open(os.path.join(tmp_dir, file_name), "r") as f:
+            file_contents = f.read()
+            if file_contents:
+                file_content_array = re.split(r"create\s+or\s+replace\s+schema", file_contents, flags=re.IGNORECASE)
+                if len(file_content_array) > 0:
+                    for k,s in enumerate(file_content_array):
+                        print(f" file: {k}, length: {len(s)}")
+                        # write it out
+                        if k == 0:
+                            new_file_name = os.path.join(tmp_dir,file_name_wo_ext+f"_{str(k)}.sql")
+                            with open(new_file_name, "w") as tf:
+                                tf.write(s)
+                                out_add_files['init'].append(new_file_name) 
+                        else:
+                            new_file_name = os.path.join(tmp_dir,"02_dbDDL_"+file_db_name+f"_{str(k)}.sql")
+                            print(new_file_name)
+                            with open(new_file_name, "w") as tf:
+                                tf.write(f"USE DATABASE {file_db_name}; \n")
+                                tf.write("CREATE OR REPLACE SCHEMA" + s)
+                                out_add_files['remainder'].append(new_file_name)
+            out_remove_files.append(os.path.join(tmp_dir, file_name))
+
 def list_scripts(migHome, objectType=''):
     l_list = [] # changed variable name from list to l_list to make sure keywords are not used for variable names
     root_folder = os.path.join(migHome, "scripts")
@@ -427,12 +456,17 @@ def get_failed_statements(con, session_id, start_time, end_time, failed_statemen
   - splits into batches based on thread_count: for example: if thread_count=4, num_of_files/thread_count is the batch size
   - retry failed statements in serial fashion to make sure dependencies are handled properly
 """
-def upload_multithreaded(thread_count, mode, con, creds, sqlfiles, tmp_dir, log_dir, verbose, continue_on_error=False, option=USE_CREATE_IF_NOT_EXISTS):
+def upload_multithreaded(thread_count, mode, con, creds, sqlfiles, tmp_dir, log_dir, verbose, continue_on_error=False, option=USE_CREATE_IF_NOT_EXISTS, split_files_list=[]):
     status_object = {'error_counter':0, 'error_exists': 'N', 'failed_statements':[], 'other_statements':[]}
     failed_sql_filename = os.path.join(log_dir, 'failed_queries.log')
     failed_queries_queue = queue.Queue()
     failed_statements = []
-    tmp_sqlfiles = []  
+    tmp_sqlfiles = [] 
+    out_remove_files = []  
+    out_add_files = {
+        'init':[],
+        'remainder':[] 
+    } 
     thread_list = [] 
     session_id_arr = [] 
     t0 = datetime.now()
@@ -442,11 +476,22 @@ def upload_multithreaded(thread_count, mode, con, creds, sqlfiles, tmp_dir, log_
     job_starttime = t0.strftime("%Y%m%d_%H%M%S")
     logger=createLogger(f"scriptloader-upload_multithreaded-{job_starttime}",log_dir)
     cleanse_files(sqlfiles,tmp_dir,tmp_sqlfiles,option) # cleanse the files and write out the new files to tmp_dir 
+    if len(split_files_list) > 0:
+        split_files_by_schema(tmp_dir, split_files_list, out_remove_files, out_add_files)
+    # remove files from tmp_sqlfiles 
+    print(len(tmp_sqlfiles))
+    for f1 in out_remove_files:
+        for k, v in enumerate(tmp_sqlfiles):
+            if v == f1: tmp_sqlfiles.pop(k)
+    tmp_sqlfiles.extend(out_add_files['remainder'])
+    print(len(tmp_sqlfiles))
     logger.info('started with {t} threads for queries on warehouse {w}'.format(t=thread_count, w=creds['warehouse']))
     # start workload
     batch_size = math.ceil(len(tmp_sqlfiles)/thread_count)
     #print(len(tmp_sqlfiles))
     #print(batch_size)
+    # run out_add_files['init'] list first sequentially
+    if len(out_add_files['init']) > 0: thread_count = thread_count + 1 
     for j in range(thread_count):
         curr_file_arr = [] 
         #print(f"inside thread_count for loop: {j}")
@@ -466,13 +511,19 @@ def upload_multithreaded(thread_count, mode, con, creds, sqlfiles, tmp_dir, log_
         curr_session_id = get_session_id(thread_con) 
         if curr_session_id:
             session_id_arr.append(curr_session_id)
-        t = threading.Thread(
-                target=workload, 
-                args=(j,thread_con,curr_file_arr,continue_on_error,failed_queries_queue,log_dir,job_starttime), 
-                name=(f"WorkerThread-{j}"))
-        thread_list.append(t)
-        t.start()
+        if j==0 and len(out_add_files['init']) > 0:
+            print('inside ')
+            inputs=(j,thread_con,out_add_files['init'],continue_on_error,failed_queries_queue,log_dir,job_starttime)
+            workload(*inputs)
+        else:
+            t = threading.Thread(
+                    target=workload, 
+                    args=(j,thread_con,curr_file_arr,continue_on_error,failed_queries_queue,log_dir,job_starttime), 
+                    name=(f"WorkerThread-{j}"))
+            thread_list.append(t)
+            t.start()
     # wait for threads to finish
+    print("before joining threads")
     for t in thread_list:
         t.join()
     print("finished processing all files ")

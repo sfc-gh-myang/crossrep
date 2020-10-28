@@ -249,7 +249,8 @@ def getConnection(acct, usr, pwd, wh, rl):
         password=pwd, 
         account=acct,
         warehouse=wh,
-        role=rl
+        role=rl,
+        timezone='UTC'
     )
     return ctx
 
@@ -264,7 +265,8 @@ def getSFConnection(acct, usr, wh, rl):
         authenticator='externalbrowser',
         passcode=passcode,
         warehouse=wh,
-        role=rl
+        role=rl,
+        timezone='UTC'
     )
     return ctx
 

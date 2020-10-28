@@ -141,6 +141,9 @@ parser.add_argument('-replace', '--replace', action='store_true',
 parser.add_argument('-parallel','--parallel', type=int, default=8, 
     help='Enter number of threads to use for running DR scripts in DR mode')
 
+parser.add_argument('-splitfilesbyschema', '--splitfilesbyschema',  type=str,
+    help='a file name with list of sql files that need to be split by schema')
+
 ### user provide database lists for grants against
 ### no -l option will generate grants for all database
 ### -l with a list (space as delimiter), will generate grants for those databases in the list
@@ -152,6 +155,7 @@ olist = args.objlist
 #dlist = args.dblist
 #db = args.priv
 dbfile = args.dbfile
+splitfiles = args.splitfilesbyschema 
 gldb = args.globaldb
 # database list to alter database global
 gf_dblist = []
@@ -205,6 +209,13 @@ else:
 if crossrep.mode == 'DR' or crossrep.mode == 'DR_TEST':
     filelist  = scriptloader.list_scripts(migHome, "ddl")
     #print(filelist)
+    # get list of files to split
+    if splitfiles:
+        split_files_list = crossrep.readFile(migHome + splitfiles)
+    else:
+        split_files_list = [] 
+    print(split_files_list)
+
     tmp_dir = os.path.join(migHome,"tmp")
     if not os.path.exists(tmp_dir):
         os.makedirs(tmp_dir)
@@ -237,8 +248,9 @@ if crossrep.mode == 'DR' or crossrep.mode == 'DR_TEST':
     else:
         threads = 8
 
+
     status_object = scriptloader.upload_multithreaded(
-        threads,crossrep.mode,ctx,creds,filelist,tmp_dir,log_dir,crossrep.verbose,continue_on_error=True, option=ddl_option)
+        threads,crossrep.mode,ctx,creds,filelist,tmp_dir,log_dir,crossrep.verbose,continue_on_error=True, option=ddl_option, split_files_list=split_files_list)
 
     #status_object = scriptloader.upload_with_stream(crossrep.mode, ctx, filelist, tmp_dir, crossrep.verbose, continue_on_error=True, option=ddl_option) 
 

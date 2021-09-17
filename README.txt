@@ -378,4 +378,3 @@ For Customers only want to execute the DDL on the target account and not using r
   python main.py -m DR -replace
   or
   python main.py -m DR_TEST -replace
-

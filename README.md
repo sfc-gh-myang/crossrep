@@ -74,7 +74,8 @@ Modify ```env_xxx.sh``` for environment variable used by python script:
 |  AU_SCHEMA=SC_ACCTUSAGE                                    |=> schema name for storing account_usage information in source account, create if not existing, only at CUSTOMER mode  |
 |  REP_ACCT_LIST=aws_us_east_1.myaccount2                    |=> account list to be enabled on replication|
 |  FAILOVER_ACCT_LIST=aws_us_east_1.myaccount2               |=> account list to be enabled on failover|
-[can have multile region.account, separate by ",", no space in between]
+
+[can have multile region.account, separate by ",", no space in between]  
 [REP_ACCT_LIST=aws_us_east_1.myaccount2,azure_westeurope.myaccount3]
 ```
   SNOWHOUSE_USER=MYANG

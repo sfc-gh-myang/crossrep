@@ -1,50 +1,38 @@
 This script is to help on generating snowflakes DDL and grants statement for account level objects and unsupported database level objects by snowflake replication including but not limited to : warehouse, network policy, resource monitor, user, roles, privileges, stage, pipe, account_usage etc.
 
-Design of cross region/cross cloud replication script
-Step 1: connecting to your source account , gather metadata information, store it in a specified database and schema (by env_xxx.sh configuration file, this is done via -c option described below)
-Step 2: generating DDLs and Grant statements using the metadata gathered by step 1 (this is done via all other options other than -c )
+Design of cross region/cross cloud replication script  
+Step 1: connecting to your source account , gather metadata information, store it in a specified database and schema (by env_xxx.sh configuration file, this is done via -c option described below)  
+Step 2: generating DDLs and Grant statements using the metadata gathered by step 1 (this is done via all other options other than -c )  
 You can then execute the generated scripts on your target account to replay/create the objects.
 
 Pre-replication Preparation:
 - python 3
 - snowSQL and Python connector
 - create database list in a text file under MIGRATION_HOME folder for replicated databases from your source account, the file contains the list of databases, one database per line  
-- pick up environment variable by running 'source env_xxx.sh' 
-where crossrep is the package created 
+- pick up environment variable by running ```source env_xxx.sh``` where crossrep is the package created 
 
-Command options description in python main.py -x where -x in one of the following:
-  -u:           to create a list of user tables to store account_usage data in schema AU_DATABASE and database AU_SCHEMA of source snowflake account. This database can be replicated to target account.
-  -c all:       to get incremental updates of metadata , and store them in local tables
-  -b:           to Generate account privige grant commands 
-  -d all:       to generate grants of ownerships and privileges on all database level objects
-      filename: file contains the list of databases to be generated grants for
-  -ddl all:     to create ddl for all databases in the account (manual replication only)
-      filename: file contains the list of databases whose DDLs need to be created, one line per database in the file.
-  -elt all:     to create elt jobs for all databases in the account (manual replication only)
-      filename: file contains the list of databases whose DDLs need to be created, one line per database in the file. 
-  -e num:       to generate report, alter/drop/ddl statement for reference objects that needs to be handled ahead of replication (cross-database referrenced and ID-based objects)
-                num is a version number to generate a different version file in case you need to execute multiple times so you don't override the previous generated files 
-  
-  -f:           to to generate future grants
-  -fr:          to disable and enable all users, suspend or resume warehouses when you want to use those commands to freeze your source account during cut-over time of switching source and target account  
-  -g all:       to generate ALTER DATABASE ENABLE REPLICATION statements for all databases 
-    filename:   file contains database list of which needs to be replicated, one line per database in the file 
-  -l all:       to generate 4 statements that 
-                1. create target database linking to source database, 
-                2. 'alter database refresh' refreshing statement 
-                3. monitor replication progress statement 
-                4. 'alter database xxx primary' switching secondary db to primary  
-    filename:   file contains database list of which needs to be replicated, one line per database in the file 
-  -mon:         executing monitoring queries on target account in PROD or customer account
-  -o olist:     to generate grants on account level objects, olist is one of multiple of ['WAREHOUSE', 'NETWORK_POLICY', 'RESOURCE_MONITOR'], space as delimiter  
-  -p :          to Generate account level parameters 
-  -pipe all:    to generate pipe DDL and their grants for all databases in account
-    filename:   file contains database list of whose pipe DDLs need to be generated, one line per database in the file
-  -r nopwd/samepwd/randpwd: to Generate users/roles and their relationships with options of no password, same static password(cr0ss2REP), or random password 
-  -stage all:    to generate external stage DDL and their grants for all databases in account
-    filename:   file contains database list of whose stages DDLs need to be generated, one line per database in the file
-  -t:           testing by generating dropping statement of all created objects in target account so it can be rerun 
-  -val filename:to validate row count and agghash for each tables between target and source account, need to connect to both
+Command options description in python main.py -x where -x in one of the following:  
+|Option|Description|
+|-----|-----|
+|  -u:           |to create a list of user tables to store account_usage data in schema AU_DATABASE and database AU_SCHEMA of source snowflake account. This database can be replicated to target account.|
+|  -c all:       |to get incremental updates of metadata , and store them in local tables|
+|  -b:           |to Generate account privige grant commands |
+|  -d all:<br/>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;filename:|to generate grants of ownerships and privileges on all database level objects  <br/>file contains the list of databases to be generated grants for|
+|  -ddl all:<br/>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;filename:|to create ddl for all databases in the account (manual replication only)<br/>file contains the list of databases whose DDLs need to be created, one line per database in the file.|
+|  -elt all:<br/>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;filename:|to create elt jobs for all databases in the account (manual replication only)<br>file contains the list of databases whose DDLs need to be created, one line per database in the file. |
+|  -e num:       |to generate report, alter/drop/ddl statement for reference objects that needs to be handled ahead of replication (cross-database referrenced and ID-based objects)<br>num is a version number to generate a different version file in case you need to execute multiple times so you don't override the previous generated files |
+|  -f:           |to to generate future grants|
+|  -fr:          |to disable and enable all users, suspend or resume warehouses when you want to use those commands to freeze your source account during cut-over time of switching source and target account  |
+|  -g all:<br/>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;filename:|to generate ALTER DATABASE ENABLE REPLICATION statements for all databases <br>file contains database list of which needs to be replicated, one line per database in the file |
+|  -l all:<br/>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;filename:|to generate 4 statements that <br>1. create target database linking to source database, <br>2. 'alter database refresh' refreshing statement <br>3. monitor replication progress statement <br>4. 'alter database xxx primary' switching secondary db to primary  <br><br>file contains database list of which needs to be replicated, one line per database in the file |
+|  -mon:         |executing monitoring queries on target account in PROD or customer account|
+|  -o olist:     |to generate grants on account level objects, olist is one of multiple of ['WAREHOUSE', 'NETWORK_POLICY', 'RESOURCE_MONITOR'], space as delimiter  |
+|  -p :          |to Generate account level parameters |
+|  -pipe all:<br/>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;filename:|to generate pipe DDL and their grants for all databases in account<br>file contains database list of whose pipe DDLs need to be generated, one line per database in the file|
+|  -r nopwd/samepwd/randpwd: |to Generate users/roles and their relationships with options of no password, same static password(cr0ss2REP), or random password |
+|  -stage all:<br/>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;filename:|to generate external stage DDL and their grants for all databases in account<br>file contains database list of whose stages DDLs need to be generated, one line per database in the file|
+|  -t:           |testing by generating dropping statement of all created objects in target account so it can be rerun |
+|  -val filename: |to validate row count and agghash for each tables between target and source account, need to connect to both|
 
 Step 1. Modify env_xxx.sh for environment variable used by python script:
 SRC_PROD_xxx is environment variable for snwoflake PROD account where customer source account locates (snowflake internal only)

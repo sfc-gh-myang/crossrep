@@ -13,3 +13,4 @@ crossrep/.DS_Store
 crossrep/__pycache__/
 scripts/*/*.sql
 scripts/*/*.sql.out
+env_xxx.sh

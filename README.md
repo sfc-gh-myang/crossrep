@@ -36,7 +36,7 @@ Command options description in python main.py -x where -x in one of the followin
 
 **Step 1.**  
 Modify ```env_xxx.sh``` for environment variable used by python script:  
-```SRC_PROD_xxx``` is environment variable for snwoflake PROD account where customer source account locates (snowflake internal only)  
+```SRC_PROD_xxx``` is environment variable for snowflake PROD account where customer source account locates (snowflake internal only)  
 `SRC_CUST_xxx` is environment variable for customer source account   
 `TGT_CUST_xxx` is environment variable for customer target account   
 `SNOWHOUSE_xxx` is environment variable for SNOWHOUSE (snowflake internal only)  

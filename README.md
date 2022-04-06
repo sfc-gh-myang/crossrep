@@ -34,46 +34,49 @@ Command options description in python main.py -x where -x in one of the followin
 |  -t:           |testing by generating dropping statement of all created objects in target account so it can be rerun |
 |  -val filename: |to validate row count and agghash for each tables between target and source account, need to connect to both|
 
-Step 1. Modify env_xxx.sh for environment variable used by python script:
-SRC_PROD_xxx is environment variable for snwoflake PROD account where customer source account locates (snowflake internal only)
-SRC_CUST_xxx is environment variable for customer source account 
-TGT_CUST_xxx is environment variable for customer target account 
-SNOWHOUSE_xxx is environment variable for SNOWHOUSE (snowflake internal only)
+**Step 1.**  
+Modify ```env_xxx.sh``` for environment variable used by python script:  
+```SRC_PROD_xxx``` is environment variable for snwoflake PROD account where customer source account locates (snowflake internal only)  
+`SRC_CUST_xxx` is environment variable for customer source account   
+`TGT_CUST_xxx` is environment variable for customer target account   
+`SNOWHOUSE_xxx` is environment variable for SNOWHOUSE (snowflake internal only)  
 
-  SRC_PROD_USER=MYANG                                       => default connecting user name to connect to snwoflake PROD account  
-  SRC_PROD_ACCOUNT=snowflake.va.us-east-1.external-zone     => snwoflake PROD account 
-  SRC_PROD_ROLE=DATA_OPS_RL                                 => default connecting role for snowflake PROD account 
-  SRC_PROD_DATABASE=SCRATCH                                 => default connecting database for snowflake PROD account, needs to exist (will create tables in this DB to store metadata)
-  SRC_PROD_SCHEMA=MIGRATION                                 => default connecting schema for snowflake PROD account, create if not existing (will create tables in this DB to store metadata)
-  SRC_PROD_WAREHOUSE=SUPPORT_2XL                            => default connecting warehouse for snowflake PROD account, needs to exist 
-  SOURCE_ACCOUNT=MIGRATION                                  => source account name that metadata is collected against, only needed in SNOWFLAKE mode, leave it empty in CUSTOMER mode   
- 
-  SRC_CUST_USER=MYANG                                       => user name to connect to source account                                      
-  SRC_CUST_ACCOUNT=migration.us-east-1                      => default connecting source account 
-  SRC_CUST_PWD=xxx                                          => default connecting user password for source account 
-  SRC_CUST_ROLE=ACCOUNTADMIN                                => default connecting user role for source account 
-  SRC_CUST_DATABASE=DB_CROSSREP                             => default connecting database name, to be used to constain metadata of customer primary account, create if not existing
-  SRC_CUST_SCHEMA=SC_CROSSREP                               => default connecting schema name, to be used to contain metadata of customer primary account, create if not existing 
-  SRC_CUST_WAREHOUSE=WH_CROSSREP                            => default connecting warehouse to use, needs to exist
-  
-  TGT_CUST_USER=MYANG                                       => user name to connect to target account                                       
-  TGT_CUST_ACCOUNT=migration									              => target account 
-  TGT_CUST_PWD=xxx                                          => user password for target account 
-  TGT_CUST_ROLE=REPADMIN                                    => user role for target account  
-  TGT_CUST_DATABASE=DB_CROSSREP                             => database name to be used to constain metadata of customer primary account in target, needs to exist
-  TGT_CUST_SCHEMA=SC_CROSSREP                               => schema name to be used to contain metadata of customer primary account in target, create if not existing 
-  TGT_CUST_WAREHOUSE=WH_CROSSREP                            => warehouse to use, needs to exist
-  
-  TARGET_ROLE=REPADMIN                                      => custom role used for replication on customer standby account 
-  MIGRATION_HOME=/Users/myang/crossreplication/prod/        => home folder for this python package code 
-  REP_MODE=CUSTOMER                                         => tell whether this is executing by CUSTOMER or SNOWFLAKE or SNOWHOUSE, or DR or DR_TEST, default mode (can be overriden using option -m )
-  AU_DATABASE=DB_CROSSREP                                   => database name for storing account_usage information in source account, create if not existing, only at CUSTOMER mode  
-  AU_SCHEMA=SC_ACCTUSAGE                                    => schema name for storing account_usage information in source account, create if not existing, only at CUSTOMER mode  
-  REP_ACCT_LIST=aws_us_east_1.myaccount2                    => account list to be enabled on replication
-  FAILOVER_ACCT_LIST=aws_us_east_1.myaccount2               => account list to be enabled on failover
+|Variable|Description|
+|---|---|
+  |SRC_PROD_USER=MYANG                                       |=> default connecting user name to connect to snwoflake PROD account  |
+|  SRC_PROD_ACCOUNT=snowflake.va.us-east-1.external-zone     |=> snwoflake PROD account |
+|  SRC_PROD_ROLE=DATA_OPS_RL                                 |=> default connecting role for snowflake PROD account |
+|  SRC_PROD_DATABASE=SCRATCH                                 |=> default connecting database for snowflake PROD account, needs to exist (will create tables in this DB to store metadata)|
+|  SRC_PROD_SCHEMA=MIGRATION                                 |=> default connecting schema for snowflake PROD account, create if not existing (will create tables in this DB to store metadata)|
+|  SRC_PROD_WAREHOUSE=SUPPORT_2XL                            |=> default connecting warehouse for snowflake PROD account, needs to exist |
+|  SOURCE_ACCOUNT=MIGRATION                                  |=> source account name that metadata is collected against, only needed in SNOWFLAKE mode, leave it empty in CUSTOMER mode   |
+| |
+|  SRC_CUST_USER=MYANG                                       |=> user name to connect to source account                                      |
+|  SRC_CUST_ACCOUNT=migration.us-east-1                      |=> default connecting source account |
+|  SRC_CUST_PWD=xxx                                          |=> default connecting user password for source account |
+|  SRC_CUST_ROLE=ACCOUNTADMIN                                |=> default connecting user role for source account |
+|  SRC_CUST_DATABASE=DB_CROSSREP                             |=> default connecting database name, to be used to constain metadata of customer primary account, create if not existing|
+|  SRC_CUST_SCHEMA=SC_CROSSREP                               |=> default connecting schema name, to be used to contain metadata of customer primary account, create if not existing |
+|  SRC_CUST_WAREHOUSE=WH_CROSSREP                            |=> default connecting warehouse to use, needs to exist|
+|  |
+|  TGT_CUST_USER=MYANG                                       |=> user name to connect to target account                                       |
+|  TGT_CUST_ACCOUNT=migration									              |=> target account |
+|  TGT_CUST_PWD=xxx                                          |=> user password for target account |
+|  TGT_CUST_ROLE=REPADMIN                                    |=> user role for target account  |
+|  TGT_CUST_DATABASE=DB_CROSSREP                             |=> database name to be used to constain metadata of customer primary account in target, needs to exist|
+|  TGT_CUST_SCHEMA=SC_CROSSREP                               |=> schema name to be used to contain metadata of customer primary account in target, create if not existing |
+|  TGT_CUST_WAREHOUSE=WH_CROSSREP                            |=> warehouse to use, needs to exist|
+|  |
+|  TARGET_ROLE=REPADMIN                                      |=> custom role used for replication on customer standby account |
+|  MIGRATION_HOME=/Users/myang/crossreplication/prod/        |=> home folder for this python package code |
+|  REP_MODE=CUSTOMER                                         |=> tell whether this is executing by CUSTOMER or SNOWFLAKE or SNOWHOUSE, or DR or DR_TEST, default mode (can be overriden using option -m )|
+|  AU_DATABASE=DB_CROSSREP                                   |=> database name for storing account_usage information in source account, create if not existing, only at CUSTOMER mode  |
+|  AU_SCHEMA=SC_ACCTUSAGE                                    |=> schema name for storing account_usage information in source account, create if not existing, only at CUSTOMER mode  |
+|  REP_ACCT_LIST=aws_us_east_1.myaccount2                    |=> account list to be enabled on replication|
+|  FAILOVER_ACCT_LIST=aws_us_east_1.myaccount2               |=> account list to be enabled on failover|
 [can have multile region.account, separate by ",", no space in between]
 [REP_ACCT_LIST=aws_us_east_1.myaccount2,azure_westeurope.myaccount3]
-
+```
   SNOWHOUSE_USER=MYANG
   SNOWHOUSE_ACCOUNT=SNOWHOUSE 
   SNOWHOUSE_ROLE=SNOWHOUSE_PHI_RO_RL
@@ -82,7 +85,8 @@ SNOWHOUSE_xxx is environment variable for SNOWHOUSE (snowflake internal only)
   SNOWHOUSE_WAREHOUSE=SNOWHOUSE 
   SNOWHOUSE_DEPLOYMENT=VA
   SNOWHOUSE_CUST_ACCOUNT=ZETAGLOBAL 
- in a terminal command line, run 'source env_xxx.sh' to pick up environment variables
+  ```
+ in a terminal command line, run `source env_xxx.sh` to pick up environment variables
  
 Step 2: to create all metadata needed initially (first run, 2nd or later run will have incremental updates)
   1) open 3 terminals, in each terminal, source env_xxx.sh

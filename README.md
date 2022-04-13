@@ -138,7 +138,7 @@ while customer is close to start replication, ask them to run the following sql 
   a3_drop_extb_xxx.sql  
   a3_drop_MV_xxx.sql  
 
-In the same time, ask custoemr to run the following (CUST mode)
+In the same time, ask customer to run the following (CUST mode)
 [From  customer account: 
 - ACCOUNT_USAGE to be created
 - network policies to be created (SNOW-83395)
@@ -149,7 +149,7 @@ Replication :
 **Step 5:**  
 Generating ALTER database enable replication/failover statements for all databases or database names from a file (by default in the MIGRATION_HOME folder)  
 `python main.py -g all`  
-`python main.py -g <dbfile>`  ==> dbfile is file name that contains database list in MIGRATION_HOME folder (one database each line in the file)  
+`python main.py -g <dbfile>`  ==> dbfile is file name that contains database list in `MIGRATION_HOME` folder (one database each line in the file)  
 
 The following files are generated:  
   b1_alter_replica_dbs.sql  
@@ -312,8 +312,8 @@ Typical use cases (using CUSTOMER mode as example):
 1. using snowflake replication engine, migrating an account from one region to another region (CUSTOMER mode)  
 
 **step 1:** generate scripts in 2 steps in the order (first step completed successfully before running 2nd step below)  
-``python main.py -m CUSTOMER -c all`  
-python main.py -m CUSTOMER -b -o WAREHOUSE RESOURCE_MONITOR NETWORK_POLICY -r nopwd -p -d dbfile -stage dbfile -pipe dbfile -f -u`  
+`python main.py -m CUSTOMER -c all`  
+`python main.py -m CUSTOMER -b -o WAREHOUSE RESOURCE_MONITOR NETWORK_POLICY -r nopwd -p -d dbfile -stage dbfile -pipe dbfile -f -u`  
   
 dbfile is the file name that contains database list in the same folder as this python code parent folder. Command above will generate DDLs  
 for account level objects and grants for all objects specicified.  

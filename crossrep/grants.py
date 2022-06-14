@@ -204,7 +204,7 @@ PLAYPEN4J_CLONED.PUBLIC."KELVIN_TO_FAREN"(NUMBER)
 # id: identifier input
 # return the function identifier after removing function input parameter name and its returning data types
 def funcID(id):
-    id=re.sub(r'\"([^:]+):.+',r'\1',id)
+    id=re.sub(r'([^:]+):.+',r'\1',id)
     match = re.search(r'([^\(]+)\(([^\)]+)\)$',id)
     if match:
         fname = match.group(1)

@@ -1,3 +1,4 @@
+# Renga Testing Update
 This script is to help on generating snowflakes DDL and grants statement for account level objects and unsupported database level objects by snowflake replication including but not limited to : warehouse, network policy, resource monitor, user, roles, privileges, stage, pipe, account_usage etc.
 
 Design of cross region/cross cloud replication script  
